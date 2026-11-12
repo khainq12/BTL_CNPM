@@ -5,7 +5,7 @@ import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
 import { DEVICE_KIND_LABEL } from '@/domain/rules'
 import { OPEN_STATUSES } from '@/domain/statuses'
-import type { DeviceKind, WarrantyCase } from '@/domain/types'
+import type { DeviceKind, Photo, WarrantyCase } from '@/domain/types'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,7 +44,7 @@ function Intake() {
   const [condition, setCondition] = useState('')
   const [acc, setAcc] = useState<string[]>([])
   const [none, setNone] = useState(false)
-  const [photos, setPhotos] = useState<File[]>([])
+  const [photos, setPhotos] = useState<Photo[]>([])
   const [tried, setTried] = useState(false)
   const [created, setCreated] = useState<WarrantyCase | null>(null)
   const m = useAction(api.createCase)
@@ -115,7 +115,7 @@ function Intake() {
           condition: condition.trim(),
           accessories: acc,
           noAccessories: none,
-          photos: photos.map((f) => f.name),
+          photos,
         },
         key.current,
       ],
@@ -278,7 +278,7 @@ function Intake() {
                 {(id) => <Textarea id={id} rows={2} value={condition} onChange={(e) => setCondition(e.target.value)} placeholder='Trầy góc trái nắp máy, bàn phím đủ phím.' />}
               </Field>
               <AccessoryPicker value={acc} onChange={setAcc} none={none} onNone={setNone} error={show(errs.acc)} />
-              <PhotoPicker files={photos} onChange={setPhotos} error={show(errs.photos)} />
+              <PhotoPicker value={photos} onChange={setPhotos} error={show(errs.photos)} />
             </div>
           </Section>
         </div>

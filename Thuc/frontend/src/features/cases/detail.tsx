@@ -17,6 +17,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Empty, Guard, InfoList, PageShell, Pill, Section, SlaBadge, StatusBadge, useName } from '@/components/woms'
 import { WoParts } from '@/features/inventory/wo-parts'
 import { ActionDialog } from './actions'
+import { PhotoGallery } from './photo-picker'
+import { CHANGE_STATUS, PlanChangeList } from './plan-change'
 import { canSeeCustomer, canViewCase, nextActions, type ActionKey } from './logic'
 
 export function CaseDetail({ id }: { id: string }) {
@@ -45,6 +47,7 @@ function Detail({ id }: { id: string }) {
   const dev = db.devices.find((x) => x.id === c.deviceId)!
   const actions = nextActions(me, c, wo)
   const sla = slaInfo(c)
+  const change = api.openChange(c)
 
   return (
     <PageShell
@@ -52,6 +55,7 @@ function Detail({ id }: { id: string }) {
         <span className='flex flex-wrap items-center gap-x-3 gap-y-1'>
           {c.code}
           <StatusBadge status={c.status} />
+          {change && <Pill tone='wait'>{CHANGE_STATUS[change.status][0]} đổi phương án</Pill>}
         </span>
       }
       description={`${DEVICE_KIND_LABEL[dev.kind]} ${dev.brand} ${dev.model}${canSeeCustomer(me) ? ` · ${cu.name}` : ''}`}
@@ -99,7 +103,9 @@ function Detail({ id }: { id: string }) {
           <Section title='Việc cần làm'>
             {actions.length === 0 ? (
               <p className='text-muted-foreground text-sm'>
-                {CASE_STATUS[c.status].owner.length
+                {change
+                  ? `Đề xuất đổi phương án #${change.no} đang ở bước "${CHANGE_STATUS[change.status][0].toLowerCase()}". Kỹ thuật viên tạm ngừng cho tới khi có kết quả.`
+                  : CASE_STATUS[c.status].owner.length
                   ? `Phiếu đang chờ ${CASE_STATUS[c.status].owner.map((r) => ({ TN: 'tiếp nhận', CSKH: 'CSKH', DP: 'điều phối', KTV: 'kỹ thuật viên', KHO: 'kho', QC: 'QC', QL: 'quản lý' })[r]).join(' hoặc ')} xử lý. Vai trò của bạn không có thao tác ở bước này.`
                   : 'Phiếu đã kết thúc.'}
               </p>
@@ -223,7 +229,7 @@ function Overview({ c }: { c: WarrantyCase }) {
             ['Lỗi khách báo', c.symptom],
             ['Tình trạng ngoài', c.condition || '—'],
             ['Phụ kiện', c.noAccessories ? 'Không có phụ kiện' : c.accessories.join(', ') || '—'],
-            ['Ảnh', c.photos.length ? `${c.photos.length} ảnh: ${c.photos.join(', ')}` : 'Chưa có'],
+            ['Ảnh hiện trạng', <PhotoGallery photos={c.photos} />],
             ['Tiếp nhận', c.receivedAt ? `${fmtDateTime(c.receivedAt)} · ${name(c.receivedBy)}` : 'Chưa nhận máy'],
             ['Kiểm tra sơ bộ', c.precheck ? `${WARRANTY_CHECK_LABEL[c.precheck.warranty]}. ${c.precheck.note}` : 'Chưa kiểm tra'],
           ]}
@@ -281,7 +287,7 @@ function WarrantyTab({ c }: { c: WarrantyCase }) {
         .slice()
         .reverse()
         .map((q) => (
-          <Section key={q.version} title={`Báo giá v${q.version}`} actions={<Pill tone={QUOTE_STATUS[q.status][1]}>{QUOTE_STATUS[q.status][0]}</Pill>}>
+          <Section key={q.version} title={q.planChangeNo ? `Báo giá bổ sung v${q.version} (đổi phương án #${q.planChangeNo})` : `Báo giá v${q.version}`} actions={<Pill tone={QUOTE_STATUS[q.status][1]}>{QUOTE_STATUS[q.status][0]}</Pill>}>
             <table className='w-full text-sm'>
               <tbody>
                 {q.items.map((i, k) => (
@@ -324,10 +330,15 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
   return (
     <div className='grid gap-4'>
       <Section title={`${wo.code}`} description={`Kỹ thuật viên: ${name(wo.technicianId)} · Lập ${fmtDateTime(wo.createdAt)}${wo.startedAt ? ` · Bắt đầu ${fmtDateTime(wo.startedAt)}` : ''}`}>
+        <p className='mb-3 text-sm'>
+          <span className='text-muted-foreground'>Phương án hiện hành: </span>
+          {api.currentPlan(c) || '—'}
+        </p>
+        {mine && api.openChange(c) && <p className='mb-3 text-sm font-medium'>Đang chờ xác nhận đổi phương án, tạm ngừng đánh dấu công việc (BR-12).</p>}
         <ul className='grid gap-2'>
           {wo.tasks.map((t) => (
             <li key={t.id} className='flex items-center gap-3 text-sm'>
-              <Checkbox checked={t.done} disabled={!mine || toggle.isPending} onCheckedChange={() => toggle.mutate([me, wo.id, t.id])} aria-label={t.title} />
+              <Checkbox checked={t.done} disabled={!mine || !!api.openChange(c) || toggle.isPending} onCheckedChange={() => toggle.mutate([me, wo.id, t.id])} aria-label={t.title} />
               <span className={cn('flex-1', t.done && 'text-muted-foreground line-through')}>{t.title}</span>
               <span className='text-muted-foreground text-xs'>{fmtMinutes(t.minutes)}</span>
             </li>
@@ -337,6 +348,7 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
       <Section title='Linh kiện'>
         <WoParts wo={wo} />
       </Section>
+      <PlanChangeList c={c} />
       <Section title='Nhật ký sửa chữa'>
         {mine && (
           <form
@@ -398,6 +410,11 @@ function QcTab({ c }: { c: WarrantyCase }) {
         .map((q) => (
           <Section key={q.round} title={`Lần ${q.round}`} description={`${name(q.by)} · ${fmtDateTime(q.at)}`} actions={<Pill tone={q.pass ? 'done' : 'bad'}>{q.pass ? 'Đạt' : 'Không đạt'}</Pill>}>
             {q.defect && <p className='mb-2 text-sm'>Lỗi còn tồn tại: {q.defect}</p>}
+            {q.photos?.length ? (
+              <div className='mb-3'>
+                <PhotoGallery photos={q.photos} />
+              </div>
+            ) : null}
             <ul className='grid gap-1 text-sm'>
               {q.items.map((i) => (
                 <li key={i.label} className='flex gap-2'>

@@ -46,7 +46,8 @@ function Inner() {
                     <Pill tone={ST[q.status][1]}>{ST[q.status][0]}</Pill>
                   </div>
                   <p className='mt-1'>{q.content}</p>
-                  {q.resolution && <p className='text-muted-foreground'>Kết quả: {q.resolution}</p>}
+                  <ComplaintLog q={q} />
+                  {q.resolution && <p className='mt-1 font-medium'>Kết quả: {q.resolution}</p>}
                   <p className='text-muted-foreground mt-1 text-xs'>
                     {name(q.createdBy)} · {fmtDateTime(q.createdAt)} · cập nhật {fmtDateTime(q.updatedAt)}
                   </p>
@@ -66,11 +67,28 @@ function Inner() {
   )
 }
 
+function ComplaintLog({ q }: { q: Complaint }) {
+  const name = useName()
+  if (!q.log?.length) return null
+  return (
+    <ul className='text-muted-foreground mt-1 grid gap-0.5'>
+      {q.log
+        .filter((l) => l.status !== 'DA_GIAI_QUYET')
+        .map((l, i) => (
+          <li key={i}>
+            {ST[l.status][0]}
+            {l.text ? `: ${l.text}` : ''} <span className='text-xs'>· {name(l.by)}, {fmtDateTime(l.at)}</span>
+          </li>
+        ))}
+    </ul>
+  )
+}
+
 function Update({ q, onClose }: { q: Complaint; onClose: () => void }) {
   const me = useMe()
   const options = me.role === 'CSKH' ? (['DANG_XU_LY', 'CHUYEN_QUAN_LY', 'DA_GIAI_QUYET'] as const) : (['DANG_XU_LY', 'DA_GIAI_QUYET'] as const)
   const [status, setStatus] = useState<(typeof options)[number]>(options[0])
-  const [text, setText] = useState(q.resolution ?? '')
+  const [text, setText] = useState('')
   const [tried, setTried] = useState(false)
   const m = useAction(api.updateComplaint, { success: 'Đã cập nhật khiếu nại', onDone: onClose })
   const need = status === 'DA_GIAI_QUYET'
@@ -92,6 +110,7 @@ function Update({ q, onClose }: { q: Complaint; onClose: () => void }) {
         </>
       }
     >
+      <ComplaintLog q={q} />
       <Field label='Tình trạng'>
         {(id) => (
           <NativeSelect id={id} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>

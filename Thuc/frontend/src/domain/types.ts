@@ -89,6 +89,7 @@ export type QuoteStatus = 'CHO_DUYET' | 'DA_DUYET' | 'TU_CHOI_DUYET' | 'DA_GUI' 
 
 export type Quote = {
   version: number
+  planChangeNo?: number // báo giá bổ sung khi đổi phương án giữa chừng (BR-12)
   items: { label: string; qty: number; unitPrice: number }[]
   labor: number
   total: number
@@ -103,7 +104,10 @@ export type Quote = {
 
 export type QcItem = { label: string; mandatory: boolean; pass: boolean; note: string }
 
-export type QcResult = { round: number; items: QcItem[]; pass: boolean; defect?: string; by: string; at: string }
+export type QcResult = { round: number; items: QcItem[]; pass: boolean; defect?: string; photos?: Photo[]; by: string; at: string }
+
+// Ảnh đính kèm. Bản chạy thử nén ảnh và lưu dạng data URL; bản thật upload lên kho tệp của backend và chỉ giữ đường dẫn.
+export type Photo = { name: string; src?: string }
 
 export type Handover = {
   recipientName: string
@@ -144,7 +148,7 @@ export type WarrantyCase = {
   condition: string
   accessories: string[]
   noAccessories: boolean
-  photos: string[]
+  photos: Photo[]
   createdAt: string
   receivedAt?: string
   receivedBy?: string
@@ -163,7 +167,32 @@ export type WarrantyCase = {
   sla: { planConfirmedAt?: string; pauses: Pause[] }
   cancelReason?: string
   pendingApprovalId?: string
+  planChanges?: PlanChange[]
   events: CaseEvent[]
+}
+
+// Đổi phương án khi đang sửa (BR-12). Phiếu vẫn ở IN_REPAIR; tiến trình xét duyệt là trạng thái phụ của đề xuất.
+export type PlanChangeStatus = 'CHO_CSKH' | 'CHO_DUYET' | 'CHO_GUI' | 'CHO_KHACH' | 'DA_AP_DUNG' | 'TU_CHOI'
+
+export type PlanChange = {
+  id: string
+  no: number
+  status: PlanChangeStatus
+  finding: string
+  oldPlan: string
+  newPlan: string
+  addTasks: { title: string; minutes: number }[]
+  addParts: { partId: string; qty: number }[]
+  extraLabor: number
+  proposedBy: string
+  proposedAt: string
+  charge?: 'MIEN_PHI' | 'CO_PHI'
+  reviewNote?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  quoteVersion?: number
+  outcome?: string
+  closedAt?: string
 }
 
 export type WoTask = { id: string; title: string; minutes: number; done: boolean; doneAt?: string }
@@ -229,6 +258,7 @@ export type Approval = {
   id: string
   type: ApprovalType
   caseId?: string
+  planChangeId?: string
   partId?: string
   qty?: number
   title: string
@@ -249,16 +279,20 @@ export type Complaint = {
   content: string
   status: 'MOI' | 'DANG_XU_LY' | 'CHUYEN_QUAN_LY' | 'DA_GIAI_QUYET'
   resolution?: string
+  log?: { at: string; by: string; status: Complaint['status']; text: string }[]
   createdBy: string
   createdAt: string
   updatedAt: string
 }
 
+// Ngày nghỉ lễ không tính vào hạn xử lý (lịch làm việc, mục 6.3). Ngày theo giờ Việt Nam, dạng yyyy-MM-dd.
+export type Holiday = { date: string; name: string }
+
 export type AuditEntry = {
   id: string
   at: string
   by: string
-  entity: 'PHIEU' | 'WO' | 'KHO' | 'PHE_DUYET' | 'TAI_KHOAN' | 'KHIEU_NAI' | 'PHIEN'
+  entity: 'PHIEU' | 'WO' | 'KHO' | 'PHE_DUYET' | 'TAI_KHOAN' | 'KHIEU_NAI' | 'PHIEN' | 'CAU_HINH'
   ref: string
   action: string
   detail?: string

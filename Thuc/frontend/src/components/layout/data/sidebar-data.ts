@@ -1,5 +1,6 @@
 import {
   Boxes,
+  CalendarDays,
   ClipboardCheck,
   ClipboardList,
   ClipboardPlus,
@@ -60,6 +61,7 @@ export const NAV: { title: string; items: NavDef[] }[] = [
     title: 'Quản trị',
     items: [
       { title: 'Tài khoản và phân quyền', url: '/quan-tri/tai-khoan', icon: UserCog, page: 'users' },
+      { title: 'Lịch làm việc', url: '/quan-tri/lich-lam-viec', icon: CalendarDays, page: 'calendar' },
       { title: 'Nhật ký thao tác', url: '/quan-tri/nhat-ky', icon: ScrollText, page: 'audit' },
     ],
   },

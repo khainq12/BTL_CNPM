@@ -1,6 +1,6 @@
 CÁC ĐIỂM TV6 TỰ SUY LUẬN KHI DỰNG FRONTEND NỘI BỘ
 WOMS - Staff Workspace
-Ngày lập: 12/11/2026
+Ngày lập: 12/11/2026 (cập nhật lần 2 cùng ngày: BR-12, ngày lễ, ảnh)
 Nguồn chính: Files/WOMS_Ban_Cuoi_Hop_Nhat_Day_Du.docx (bản hợp nhất 12/11/2026)
 
 Tài liệu hợp nhất là nguồn chính. Các mục dưới đây là chỗ tài liệu chưa nói rõ,
@@ -108,8 +108,32 @@ Khi nhóm chốt khác đi, sửa ở file cấu hình tương ứng (ghi trong 
 
 2.12. Hủy phiếu chỉ cho phép ở trạng thái RECEIVED (theo bảng 6.2) và luôn cần quản lý duyệt.
 
-2.13. Chưa dựng: thay đổi phương án giữa chừng khi đang sửa (BR-12) kèm tạm dừng chờ khách xác nhận
-      lại giá (PARAM-16). Hàm tính thời hạn đã hỗ trợ loại tạm dừng này, nhưng chưa có màn hình.
+2.13. Đổi phương án khi đang sửa (BR-12). Bảng 6.2 không có bước chuyển riêng, nên phiếu vẫn ở
+      IN_REPAIR; đề xuất có trạng thái phụ riêng (mục 6.2 cho phép thêm trạng thái phụ):
+        chờ CSKH xét -> (chờ quản lý duyệt báo giá -> chờ gửi) -> chờ khách xác nhận -> đã áp dụng / không áp dụng.
+      Luồng suy ra từ RACI 5.4 và giải thích bên dưới RACI:
+        - Kỹ thuật viên đang sửa ghi lỗi mới, phương án mới, công việc và linh kiện bổ sung, tiền công ước tính.
+        - CSKH chọn: trong phạm vi bảo hành (áp dụng ngay), phát sinh phí (lập báo giá bổ sung),
+          hoặc không chấp nhận (làm tiếp phương án cũ).
+        - Báo giá bổ sung trên 2.000.000 đ cần quản lý duyệt trước khi gửi (BR-07), tính theo riêng
+          phần bổ sung, không cộng báo giá cũ.
+        - Gửi báo giá bổ sung thì bắt đầu tạm dừng hạn "chờ xác nhận lại giá", tối đa 5 ngày (PARAM-16).
+        - Khách đồng ý: công việc, linh kiện mới được thêm vào lệnh sửa chữa; kho giữ và cấp phát
+          phần thêm như bình thường. Khách từ chối: CSKH chọn làm tiếp phương án cũ, hoặc dừng sửa
+          và chuyển RETURN_PENDING (bước IN_REPAIR -> RETURN_PENDING không có trong bảng 6.2).
+        - Trong lúc chờ, kỹ thuật viên không đánh dấu công việc, không hoàn tất được; vẫn ghi nhật ký được.
+        - Dừng sửa giữa chừng: linh kiện đang giữ được trả về khả dụng; linh kiện đã cấp mà chưa dùng
+          chuyển "chờ trả kho" (coi như chưa dùng cái nào). Áp dụng cả khi quản lý chọn "Dừng sửa"
+          sau MANAGER_REVIEW.
+        - Mỗi lần chỉ có một đề xuất đang mở. Lưu cả phương án cũ và mới.
+      Cần xác nhận: TV2, TV5. (src/api/service.ts, mục "Đổi phương án"; src/features/cases/plan-change.tsx)
+
+2.14. Kho chỉ cấp phát linh kiện khi lệnh sửa chữa đã có kỹ thuật viên được phân công,
+      vì cấp phát là giao cho người cụ thể (BR-15). Giữ linh kiện thì làm được trước khi phân công.
+      Cần xác nhận: TV2.
+
+2.15. Khiếu nại lưu lịch sử từng lần cập nhật (tình trạng, ghi chú, người, giờ). Khi đóng khiếu nại
+      phải ghi kết quả mới, không dùng lại ghi chú của lần chuyển quản lý.
 
 
 3. THỜI HẠN XỬ LÝ (SLA)
@@ -120,8 +144,18 @@ Khi nhóm chốt khác đi, sửa ở file cấu hình tương ứng (ghi trong 
 3.2. Trước khi xác nhận phương án, phiếu hiện "Chưa tính hạn".
 3.3. Hạn dừng tính khi thiết bị sẵn sàng bàn giao hoặc chuyển trả không sửa; từ đó theo dõi riêng
      số ngày chờ khách nhận (PARAM-05: quá 30 ngày thì cảnh báo).
-3.4. Giờ làm việc 08:00-17:30, Thứ 2 đến Thứ 7, giờ Việt Nam. Chưa tính ngày lễ.
-     Cần xác nhận: TV4 (lịch nghỉ lễ). (src/domain/sla.ts)
+3.4. Giờ làm việc 08:00-17:30, Thứ 2 đến Thứ 7, giờ Việt Nam, trừ ngày nghỉ lễ.
+     Ngày nghỉ lễ do quản lý khai báo ở màn "Lịch làm việc" (Quản trị). Dữ liệu mẫu có các ngày nghỉ
+     năm 2026 theo thông báo nghỉ hằng năm (Tết Dương lịch, Tết Nguyên đán 14-22/02, nghỉ bù Giỗ Tổ 27/04,
+     30/04, 01/05, Quốc khánh 01-02/09) và 01/01/2027. Tết Nguyên đán 2027 chưa nhập vì chưa có
+     thông báo chính thức. Các ngày này cần quản lý đối chiếu lại.
+     Thêm hoặc xóa ngày nghỉ thì hạn của mọi phiếu đang mở được tính lại ngay.
+     Giờ làm việc giữ cố định trong cấu hình, không sửa trên giao diện.
+     Cần xác nhận: TV2 (danh sách ngày nghỉ), TV4 (lưu lịch ở backend). (src/domain/sla.ts)
+3.5. Tạm dừng bắt đầu khi phiếu đã quá hạn thì không dời hạn: thời gian tạm dừng chỉ được trừ
+     nếu bắt đầu trước hạn. Phiếu vẫn hiện "Quá hạn" trong lúc tạm dừng đó.
+     Căn cứ: mục 6.3 yêu cầu lưu "thời gian vượt giới hạn"; tạm dừng không xóa vi phạm đã xảy ra.
+     Cần xác nhận: TV2.
 
 
 4. DỮ LIỆU, GIAO DIỆN, KỸ THUẬT
@@ -137,8 +171,12 @@ Khi nhóm chốt khác đi, sửa ở file cấu hình tương ứng (ghi trong 
      Thử bằng cách mở 2 tab, đăng nhập 2 tài khoản, cùng thao tác trên một phiếu.
 4.4. Phiên đăng nhập 8 giờ (một ca làm việc). Mật khẩu mới tối thiểu 8 ký tự, có chữ và số.
      Cần xác nhận: TV4.
-4.5. Ảnh hiện trạng: tối đa 8 ảnh, mỗi ảnh tối đa 10 MB; hiện chỉ lưu tên tệp.
-     Cần xác nhận: TV4 (upload qua backend hay MinIO).
+4.5. Ảnh hiện trạng: tối đa 8 ảnh, nhận tệp gốc tới 15 MB. Ảnh được nén ngay trên trình duyệt
+     (cạnh dài tối đa 1280 px, JPEG) rồi mới lưu, để tiết kiệm dung lượng và băng thông.
+     Bản chạy thử lưu ảnh nén trong localStorage; đầy bộ nhớ thì báo lỗi và không lưu thay đổi.
+     QC được đính kèm tối đa 4 ảnh kết quả kiểm tra (không bắt buộc, theo "nếu cần" ở mô tả vai trò QC).
+     Bấm vào ảnh để xem lớn. Ảnh trong dữ liệu mẫu chỉ có tên tệp.
+     Cần xác nhận: TV4 (API upload, nơi lưu tệp, có cần giữ ảnh gốc không).
 4.6. Checklist QC theo loại thiết bị (laptop, PC, máy in) do TV6 đề xuất. Cần xác nhận: TV2.
 4.7. Danh sách lý do yêu cầu bổ sung, phương thức khách xác nhận giá, danh sách phụ kiện
      do TV6 đề xuất. Cần xác nhận: TV2. (src/domain/rules.ts)

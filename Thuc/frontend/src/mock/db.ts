@@ -4,12 +4,14 @@ import type {
   Complaint,
   Customer,
   Device,
+  Holiday,
   Part,
   StockMove,
   User,
   WarrantyCase,
   WorkOrder,
 } from '@/domain/types'
+import { setHolidays } from '@/domain/sla'
 import * as seed from './seed'
 
 // "Backend giả" lưu trong localStorage để dữ liệu còn sau khi tải lại trang và dùng chung giữa các tab
@@ -26,11 +28,12 @@ export type Db = {
   complaints: Complaint[]
   stockMoves: StockMove[]
   audit: AuditEntry[]
+  holidays: Holiday[]
   idempotency: Record<string, string>
   counters: { case: number; wo: number; complaint: number }
 }
 
-const KEY = 'woms-db-v1'
+const KEY = 'woms-db-v2' // đổi khi cấu trúc dữ liệu giả thay đổi, để trình duyệt nạp lại dữ liệu mẫu
 
 function fresh(): Db {
   const db: Db = structuredClone({
@@ -44,6 +47,7 @@ function fresh(): Db {
     complaints: seed.complaints,
     stockMoves: seed.stockMoves,
     audit: seed.audit,
+    holidays: seed.holidays,
     idempotency: {},
     counters: { case: 200, wo: 40, complaint: 4 },
   })
@@ -68,16 +72,22 @@ export function loadDb(): Db {
   } catch {
     cache = fresh()
   }
+  setHolidays(cache.holidays.map((h) => h.date))
   return cache
 }
 
+export class StorageFullError extends Error {}
+
 export function saveDb(db: Db) {
-  cache = db
   try {
     localStorage.setItem(KEY, JSON.stringify(db))
-  } catch {
-    // bộ nhớ trình duyệt bị chặn: vẫn chạy được trong phiên hiện tại
+  } catch (e) {
+    // Hết dung lượng (thường do ảnh): không nhận thay đổi để dữ liệu hiển thị khớp với dữ liệu đã lưu.
+    if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) throw new StorageFullError()
+    // Bộ nhớ bị chặn (chế độ riêng tư): vẫn chạy trong phiên hiện tại.
   }
+  cache = db
+  setHolidays(db.holidays.map((h) => h.date))
 }
 
 export function resetDb() {

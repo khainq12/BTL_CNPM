@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import type { User } from '@/domain/types'
-import { loadDb, onExternalChange, type Db } from '@/mock/db'
+import { loadDb, onExternalChange, StorageFullError, type Db } from '@/mock/db'
 import { useAuthStore } from '@/stores/auth-store'
 import { ApiError } from './service'
 
@@ -29,6 +29,7 @@ export function useMe(): User {
 
 export function describeError(e: unknown) {
   if (e instanceof ApiError) return e.message
+  if (e instanceof StorageFullError) return 'Bộ nhớ trình duyệt đã đầy nên thay đổi chưa được lưu. Bớt ảnh đính kèm, hoặc khôi phục dữ liệu mẫu ở trang đăng nhập.'
   return 'Có lỗi không mong muốn. Thử lại sau ít phút; nếu vẫn lỗi, báo quản trị hệ thống.'
 }
 

@@ -5,6 +5,7 @@ import type {
   Complaint,
   Customer,
   Device,
+  Holiday,
   Part,
   StockMove,
   User,
@@ -93,7 +94,7 @@ function mk(s: CaseSeed): WarrantyCase {
     condition: 'Nguyên vẹn',
     accessories: ['Sạc / adapter'],
     noAccessories: false,
-    photos: ['mat-truoc.jpg', 'mat-sau.jpg'],
+    photos: [{ name: 'mat-truoc.jpg' }, { name: 'mat-sau.jpg' }],
     createdAt: ago(30),
     receivedAt: ago(30),
     receivedBy: 'u-tn',
@@ -199,3 +200,15 @@ export const stockMoves: StockMove[] = [
 ]
 
 export const audit: AuditEntry[] = []
+
+// Ngày nghỉ lễ theo thông báo nghỉ hằng năm. Quản lý cập nhật ở màn "Lịch làm việc" khi có thông báo mới.
+export const holidays: Holiday[] = [
+  { date: '2026-01-01', name: 'Tết Dương lịch' },
+  ...['14', '15', '16', '17', '18', '19', '20', '21', '22'].map((d) => ({ date: `2026-02-${d}`, name: 'Tết Nguyên đán' })),
+  { date: '2026-04-27', name: 'Nghỉ bù Giỗ Tổ Hùng Vương' },
+  { date: '2026-04-30', name: 'Ngày Giải phóng miền Nam' },
+  { date: '2026-05-01', name: 'Quốc tế Lao động' },
+  { date: '2026-09-01', name: 'Quốc khánh' },
+  { date: '2026-09-02', name: 'Quốc khánh' },
+  { date: '2027-01-01', name: 'Tết Dương lịch' },
+]

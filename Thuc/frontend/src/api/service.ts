@@ -9,6 +9,8 @@ import type {
   Diagnosis,
   EligibilityDecision,
   Handover,
+  Photo,
+  PlanChange,
   QcItem,
   Quote,
   Role,
@@ -136,7 +138,7 @@ export type IntakeInput = {
   condition: string
   accessories: string[]
   noAccessories: boolean
-  photos: string[]
+  photos: Photo[]
 }
 
 export async function createCase(user: User, input: IntakeInput, idempotencyKey: string) {
@@ -191,7 +193,7 @@ export async function createCase(user: User, input: IntakeInput, idempotencyKey:
   return c
 }
 
-export function acceptOnline(user: User, id: string, v: number, d: { condition: string; accessories: string[]; noAccessories: boolean; photos: string[] }) {
+export function acceptOnline(user: User, id: string, v: number, d: { condition: string; accessories: string[]; noAccessories: boolean; photos: Photo[] }) {
   need(user, ['TN'])
   return onCase(user, id, v, 'Nhận máy, lập biên nhận', (c) => {
     expectStatus(c, 'PENDING_ACCEPT')
@@ -467,6 +469,7 @@ export function markShortage(user: User, woId: string, note: string) {
 export function issueParts(user: User, woId: string) {
   need(user, ['KHO'])
   return onWo(user, woId, 'Cấp phát linh kiện cho kỹ thuật viên', (w, _c, db) => {
+    if (!w.technicianId) throw new ApiError(422, 'Lệnh sửa chữa chưa có kỹ thuật viên nhận linh kiện.')
     const notes: string[] = []
     for (const line of w.parts) {
       if (line.reserved <= 0) continue
@@ -559,6 +562,7 @@ export async function toggleTask(user: User, woId: string, taskId: string) {
   if (w.technicianId !== user.id) throw new ApiError(403, 'Lệnh sửa chữa được giao cho kỹ thuật viên khác.')
   const c = findCase(db, w.caseId)
   if (c.status !== 'IN_REPAIR') throw new ApiError(422, 'Chỉ cập nhật công việc khi đang sửa.')
+  if (openChange(c)) throw new ApiError(422, 'Đang chờ xác nhận đổi phương án. Tạm ngừng công việc cho tới khi có kết quả (BR-12).')
   const t = w.tasks.find((x) => x.id === taskId)!
   t.done = !t.done
   t.doneAt = t.done ? now() : undefined
@@ -582,7 +586,9 @@ export function finishRepair(user: User, id: string, v: number, used: Record<str
     expectStatus(c, 'IN_REPAIR')
     const w = findWo(db, c.workOrderId)
     if (w.technicianId !== user.id) throw new ApiError(403, 'Lệnh sửa chữa được giao cho kỹ thuật viên khác.')
+    if (openChange(c)) throw new ApiError(422, 'Đang chờ xác nhận đổi phương án (BR-12).')
     if (w.tasks.some((t) => !t.done)) throw new ApiError(422, 'Còn công việc chưa hoàn thành (BR-19).')
+    if (w.parts.some((p) => p.issued < p.qty)) throw new ApiError(422, 'Chưa nhận đủ linh kiện của phương án hiện hành từ kho.')
     for (const p of w.parts) {
       const u = used[p.partId] ?? p.issued
       if (u < 0 || u > p.issued - p.used) throw new ApiError(422, 'Số linh kiện đã dùng không hợp lệ.')
@@ -595,9 +601,176 @@ export function finishRepair(user: User, id: string, v: number, used: Record<str
   })
 }
 
+// ---------- Đổi phương án khi đang sửa (BR-12) ----------
+// Bảng 6.2 không có bước chuyển riêng cho việc này. Theo RACI: KTV đề xuất, CSKH xét lại điều kiện bảo hành
+// và báo giá, quản lý duyệt nếu báo giá bổ sung vượt ngưỡng, khách xác nhận lại (tạm dừng hạn tối đa 5 ngày, PARAM-16).
+
+const OPEN_CHANGE: PlanChange['status'][] = ['CHO_CSKH', 'CHO_DUYET', 'CHO_GUI', 'CHO_KHACH']
+
+export function openChange(c: WarrantyCase) {
+  return c.planChanges?.find((x) => OPEN_CHANGE.includes(x.status))
+}
+
+export function currentPlan(c: WarrantyCase) {
+  return c.planChanges?.filter((x) => x.status === 'DA_AP_DUNG').at(-1)?.newPlan ?? c.diagnosis?.plan ?? ''
+}
+
+function needOpenChange(c: WarrantyCase, ...s: PlanChange['status'][]) {
+  const ch = openChange(c)
+  if (!ch || !s.includes(ch.status)) throw new ApiError(422, 'Không có đề xuất đổi phương án ở bước này. Tải lại để xem trạng thái mới nhất.')
+  return ch
+}
+
+function applyChange(db: Db, c: WarrantyCase, ch: PlanChange) {
+  const w = findWo(db, c.workOrderId)
+  ch.addTasks.forEach((t, i) => w.tasks.push({ id: `${w.id}-pc${ch.no}-${i}`, title: t.title, minutes: t.minutes, done: false }))
+  for (const p of ch.addParts) {
+    const line = w.parts.find((x) => x.partId === p.partId)
+    if (line) line.qty += p.qty
+    else w.parts.push({ partId: p.partId, qty: p.qty, reserved: 0, issued: 0, used: 0, returnPending: 0, returned: 0 })
+  }
+  ch.status = 'DA_AP_DUNG'
+  ch.closedAt = now()
+  audit(db, ch.reviewedBy ?? ch.proposedBy, 'WO', w.code, `Áp dụng phương án mới (đề xuất #${ch.no})`, ch.newPlan)
+}
+
+// Dừng sửa giữa chừng: bỏ giữ linh kiện chưa cấp; linh kiện đã cấp mà chưa dùng chờ kho nhận lại (BR-16).
+function releaseWoParts(db: Db, user: User, w: WorkOrder) {
+  for (const line of w.parts) {
+    if (line.reserved > 0) {
+      const part = db.parts.find((x) => x.id === line.partId)!
+      part.reserved -= line.reserved
+      db.stockMoves.unshift({ id: uid('s'), at: now(), by: user.id, type: 'BO_GIU', partId: line.partId, qty: line.reserved, woCode: w.code, note: 'Dừng sửa' })
+      line.reserved = 0
+    }
+    line.returnPending = line.issued - line.used - line.returned
+  }
+}
+
+export type PlanChangeInput = Pick<PlanChange, 'finding' | 'newPlan' | 'addTasks' | 'addParts' | 'extraLabor'>
+
+export function proposePlanChange(user: User, id: string, v: number, d: PlanChangeInput) {
+  need(user, ['KTV'])
+  return onCase(user, id, v, 'Đề xuất đổi phương án sửa chữa', (c, db) => {
+    expectStatus(c, 'IN_REPAIR')
+    const w = findWo(db, c.workOrderId)
+    if (w.technicianId !== user.id) throw new ApiError(403, 'Lệnh sửa chữa được giao cho kỹ thuật viên khác.')
+    if (openChange(c)) throw new ApiError(422, 'Đã có đề xuất đổi phương án đang chờ xử lý.')
+    if (!d.finding.trim() || !d.newPlan.trim()) throw new ApiError(422, 'Ghi lỗi mới phát hiện và phương án đề xuất.')
+    if (d.addParts.some((p) => !(p.qty > 0) || !db.parts.some((x) => x.id === p.partId))) throw new ApiError(422, 'Linh kiện bổ sung không hợp lệ.')
+    c.planChanges ??= []
+    const ch: PlanChange = { id: uid('pc'), no: c.planChanges.length + 1, status: 'CHO_CSKH', ...d, oldPlan: currentPlan(c), proposedBy: user.id, proposedAt: now() }
+    c.planChanges.push(ch)
+    return { note: `#${ch.no}: ${d.finding}` }
+  })
+}
+
+export function reviewPlanChange(
+  user: User,
+  id: string,
+  v: number,
+  d: { result: 'MIEN_PHI' | 'CO_PHI' | 'KHONG_DONG_Y'; note: string; quote?: QuoteInput }
+) {
+  need(user, ['CSKH'])
+  const action = {
+    MIEN_PHI: 'Chấp nhận đổi phương án, không phát sinh phí',
+    CO_PHI: 'Lập báo giá bổ sung cho phương án mới',
+    KHONG_DONG_Y: 'Không chấp nhận đổi phương án',
+  }[d.result]
+  return onCase(user, id, v, action, (c, db) => {
+    expectStatus(c, 'IN_REPAIR')
+    const ch = needOpenChange(c, 'CHO_CSKH')
+    if (!d.note.trim()) throw new ApiError(422, 'Ghi căn cứ kết luận (BR-05).')
+    Object.assign(ch, { reviewNote: d.note, reviewedBy: user.id, reviewedAt: now() })
+    if (d.result === 'KHONG_DONG_Y') {
+      Object.assign(ch, { status: 'TU_CHOI', outcome: 'CSKH không chấp nhận, tiếp tục phương án cũ', closedAt: now() })
+      return { note: `#${ch.no}: ${d.note}` }
+    }
+    if (d.result === 'MIEN_PHI') {
+      ch.charge = 'MIEN_PHI'
+      applyChange(db, c, ch)
+      ch.outcome = 'Áp dụng, trong phạm vi bảo hành'
+      return { note: `#${ch.no}: ${d.note}` }
+    }
+    if (!d.quote || d.quote.items.length + (d.quote.labor > 0 ? 1 : 0) === 0) throw new ApiError(422, 'Báo giá bổ sung chưa có hạng mục.')
+    const total = d.quote.items.reduce((s, i) => s + i.qty * i.unitPrice, 0) + d.quote.labor
+    const over = total > PARAMS.quoteApprovalThreshold
+    const q: Quote = {
+      version: c.quotes.length + 1,
+      planChangeNo: ch.no,
+      ...d.quote,
+      total,
+      status: over ? 'CHO_DUYET' : 'DA_GUI',
+      createdBy: user.id,
+      createdAt: now(),
+      sentAt: over ? undefined : now(),
+    }
+    c.quotes.push(q)
+    Object.assign(ch, { charge: 'CO_PHI', quoteVersion: q.version })
+    if (over) {
+      const ap = newApproval(db, user, 'BAO_GIA', {
+        caseId: c.id,
+        planChangeId: ch.id,
+        title: `Báo giá bổ sung ${total.toLocaleString('vi-VN')} đ vượt ngưỡng ${PARAMS.quoteApprovalThreshold.toLocaleString('vi-VN')} đ`,
+        detail: `${c.code}, đổi phương án #${ch.no}. ${d.note}`,
+      })
+      c.pendingApprovalId = ap.id
+      ch.status = 'CHO_DUYET'
+      return { note: `Báo giá bổ sung v${q.version} chờ quản lý duyệt (BR-07).` }
+    }
+    ch.status = 'CHO_KHACH'
+    c.sla.pauses.push({ reason: 'CHO_XAC_NHAN_GIA', start: now() })
+    return { note: `Đã gửi báo giá bổ sung v${q.version} cho khách. Tạm dừng tính hạn tối đa ${PARAMS.pauseQuoteMaxDays} ngày làm việc (PARAM-16).` }
+  })
+}
+
+export function sendPlanChangeQuote(user: User, id: string, v: number) {
+  need(user, ['CSKH'])
+  return onCase(user, id, v, 'Gửi báo giá bổ sung đã duyệt cho khách', (c) => {
+    const ch = needOpenChange(c, 'CHO_GUI')
+    const q = c.quotes.find((x) => x.version === ch.quoteVersion)
+    if (q?.status !== 'DA_DUYET') throw new ApiError(422, 'Báo giá bổ sung chưa được quản lý duyệt.')
+    q.status = 'DA_GUI'
+    q.sentAt = now()
+    ch.status = 'CHO_KHACH'
+    c.sla.pauses.push({ reason: 'CHO_XAC_NHAN_GIA', start: now() })
+    return { note: `Báo giá v${q.version}. Tạm dừng tính hạn (PARAM-16).` }
+  })
+}
+
+export function respondPlanChange(
+  user: User,
+  id: string,
+  v: number,
+  d: { accepted: boolean; method: string; note: string; next?: 'TIEP_TUC' | 'TRA_MAY' }
+) {
+  need(user, ['CSKH'])
+  return onCase(user, id, v, d.accepted ? 'Khách đồng ý báo giá bổ sung' : 'Khách từ chối báo giá bổ sung', (c, db) => {
+    expectStatus(c, 'IN_REPAIR')
+    const ch = needOpenChange(c, 'CHO_KHACH')
+    if (!d.method) throw new ApiError(422, 'Chọn phương thức khách xác nhận (C08).')
+    const q = c.quotes.find((x) => x.version === ch.quoteVersion)!
+    Object.assign(q, { status: d.accepted ? 'KHACH_DONG_Y' : 'KHACH_TU_CHOI', confirmMethod: d.method, confirmNote: d.note, respondedAt: now() })
+    endPause(c, 'CHO_XAC_NHAN_GIA')
+    if (d.accepted) {
+      applyChange(db, c, ch)
+      ch.outcome = `Khách đồng ý báo giá v${q.version}`
+      return { note: `${d.method}${d.note ? `. ${d.note}` : ''}` }
+    }
+    Object.assign(ch, { status: 'TU_CHOI', closedAt: now() })
+    if (d.next === 'TRA_MAY') {
+      ch.outcome = 'Khách từ chối, dừng sửa và trả thiết bị'
+      releaseWoParts(db, user, findWo(db, c.workOrderId))
+      return { to: 'RETURN_PENDING', note: `${d.method}. Khách không đồng ý chi phí phát sinh, dừng sửa.` }
+    }
+    ch.outcome = 'Khách từ chối, tiếp tục phương án cũ'
+    return { note: `${d.method}. Tiếp tục theo phương án cũ.` }
+  })
+}
+
 // ---------- Kiểm tra chất lượng (QC) ----------
 
-export function submitQc(user: User, id: string, v: number, items: QcItem[], defect: string) {
+export function submitQc(user: User, id: string, v: number, items: QcItem[], defect: string, photos: Photo[] = []) {
   need(user, ['QC'])
   return onCase(user, id, v, 'Ghi kết quả kiểm tra chất lượng', (c, db) => {
     expectStatus(c, 'TESTING')
@@ -605,7 +778,7 @@ export function submitQc(user: User, id: string, v: number, items: QcItem[], def
     if (w.technicianId === user.id) throw new ApiError(403, 'Người kiểm tra phải khác người sửa.')
     const pass = items.every((i) => !i.mandatory || i.pass)
     if (!pass && !defect.trim()) throw new ApiError(422, 'Kết quả không đạt phải mô tả lỗi còn tồn tại.')
-    c.qc.push({ round: c.qc.length + 1, items, pass, defect: pass ? undefined : defect, by: user.id, at: now() })
+    c.qc.push({ round: c.qc.length + 1, items, pass, defect: pass ? undefined : defect, photos: photos.length ? photos : undefined, by: user.id, at: now() })
     if (pass) {
       c.readyAt = now()
       return { to: 'READY_FOR_DELIVERY', note: `Đạt lần ${c.qc.length}` }
@@ -664,7 +837,12 @@ export async function decideApproval(user: User, approvalId: string, d: { approv
     case 'BAO_GIA': {
       const q = c!.quotes.at(-1)!
       q.status = d.approve ? 'DA_DUYET' : 'TU_CHOI_DUYET'
-      move('ELIGIBILITY_REVIEW', d.approve ? 'Quản lý duyệt báo giá' : 'Quản lý từ chối báo giá')
+      const ch = ap.planChangeId ? c!.planChanges?.find((x) => x.id === ap.planChangeId) : undefined
+      if (ch) {
+        // Báo giá bổ sung khi đổi phương án: phiếu vẫn đang sửa, chỉ đề xuất chuyển bước.
+        ch.status = d.approve ? 'CHO_GUI' : 'CHO_CSKH'
+        move(undefined, d.approve ? `Quản lý duyệt báo giá bổ sung v${q.version}` : `Quản lý từ chối báo giá bổ sung v${q.version}`)
+      } else move('ELIGIBILITY_REVIEW', d.approve ? 'Quản lý duyệt báo giá' : 'Quản lý từ chối báo giá')
       break
     }
     case 'NGOAI_LE_BH':
@@ -678,6 +856,7 @@ export async function decideApproval(user: User, approvalId: string, d: { approv
     case 'XEM_XET_QC':
       if (!d.option) throw new ApiError(422, 'Chọn phương án tiếp theo.')
       move(d.option === 'SUA_TIEP' ? 'IN_REPAIR' : 'RETURN_PENDING', d.option === 'SUA_TIEP' ? 'Quản lý duyệt sửa tiếp' : 'Quản lý duyệt dừng sửa, trả thiết bị')
+      if (d.option === 'TRA_MAY') releaseWoParts(db, user, findWo(db, c!.workOrderId))
       if (d.option === 'SUA_TIEP') {
         const w = findWo(db, c!.workOrderId)
         w.tasks.push({ id: `${w.id}-mr${Date.now()}`, title: `Xử lý theo chỉ đạo quản lý: ${d.note || 'xem lịch sử phiếu'}`, minutes: 60, done: false })
@@ -719,7 +898,8 @@ export async function updateComplaint(user: User, id: string, status: 'DANG_XU_L
   if (status === 'DA_GIAI_QUYET' && !resolution.trim()) throw new ApiError(422, 'Ghi kết quả giải quyết.')
   if (status === 'CHUYEN_QUAN_LY' && user.role !== 'CSKH') throw new ApiError(403, 'Chỉ CSKH chuyển khiếu nại lên quản lý.')
   q.status = status
-  q.resolution = resolution || q.resolution
+  if (status === 'DA_GIAI_QUYET') q.resolution = resolution.trim()
+  q.log = [...(q.log ?? []), { at: now(), by: user.id, status, text: resolution.trim() }]
   q.updatedAt = now()
   audit(db, user.id, 'KHIEU_NAI', q.code, `Cập nhật: ${status}`, resolution)
   saveDb(db)
@@ -750,5 +930,31 @@ export async function resetPassword(user: User, userId: string) {
   const u = db.users.find((x) => x.id === userId)!
   u.password = DEMO_PASSWORD
   audit(db, user.id, 'TAI_KHOAN', u.username, 'Đặt lại mật khẩu')
+  saveDb(db)
+}
+
+// ---------- Lịch làm việc (QL) ----------
+
+export async function addHoliday(user: User, date: string, name: string) {
+  need(user, ['QL'])
+  await wait()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new ApiError(422, 'Chọn ngày nghỉ.')
+  if (!name.trim()) throw new ApiError(422, 'Ghi tên ngày nghỉ.')
+  const db = structuredClone(loadDb())
+  if (db.holidays.some((h) => h.date === date)) throw new ApiError(422, 'Ngày này đã có trong lịch nghỉ.')
+  db.holidays.push({ date, name: name.trim() })
+  db.holidays.sort((a, b) => a.date.localeCompare(b.date))
+  audit(db, user.id, 'CAU_HINH', date, 'Thêm ngày nghỉ', name.trim())
+  saveDb(db)
+}
+
+export async function removeHoliday(user: User, date: string) {
+  need(user, ['QL'])
+  await wait()
+  const db = structuredClone(loadDb())
+  const h = db.holidays.find((x) => x.date === date)
+  if (!h) throw new ApiError(404, 'Ngày nghỉ không còn trong lịch.')
+  db.holidays = db.holidays.filter((x) => x.date !== date)
+  audit(db, user.id, 'CAU_HINH', date, 'Xóa ngày nghỉ', h.name)
   saveDb(db)
 }

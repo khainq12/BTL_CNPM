@@ -43,6 +43,7 @@ export const PAGE_ROLES = {
   complaints: ['CSKH', 'QL'],
   users: ['QL'],
   audit: ['QL'],
+  calendar: ['QL'],
 } satisfies Record<string, Role[]>
 
 export type PageKey = keyof typeof PAGE_ROLES

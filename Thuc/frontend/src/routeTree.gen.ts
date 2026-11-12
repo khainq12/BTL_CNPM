@@ -33,6 +33,7 @@ import { Route as AuthenticatedKhoNhapRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedKhoYeuCauRouteImport } from './routes/_authenticated/kho/yeu-cau'
 import { Route as AuthenticatedPhieuIndexRouteImport } from './routes/_authenticated/phieu/index'
 import { Route as AuthenticatedPhieuIdRouteImport } from './routes/_authenticated/phieu/$id'
+import { Route as AuthenticatedQuanTriLichLamViecRouteImport } from './routes/_authenticated/quan-tri/lich-lam-viec'
 import { Route as AuthenticatedQuanTriNhatKyRouteImport } from './routes/_authenticated/quan-tri/nhat-ky'
 import { Route as AuthenticatedQuanTriTaiKhoanRouteImport } from './routes/_authenticated/quan-tri/tai-khoan'
 import { Route as AuthenticatedThietBiIdRouteImport } from './routes/_authenticated/thiet-bi/$id'
@@ -160,6 +161,12 @@ const AuthenticatedPhieuIdRoute = AuthenticatedPhieuIdRouteImport.update({
   path: '/phieu/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedQuanTriLichLamViecRoute =
+  AuthenticatedQuanTriLichLamViecRouteImport.update({
+    id: '/quan-tri/lich-lam-viec',
+    path: '/quan-tri/lich-lam-viec',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedQuanTriNhatKyRoute =
   AuthenticatedQuanTriNhatKyRouteImport.update({
     id: '/quan-tri/nhat-ky',
@@ -211,6 +218,7 @@ export interface FileRoutesByFullPath {
   '/kho/nhap': typeof AuthenticatedKhoNhapRoute
   '/kho/yeu-cau': typeof AuthenticatedKhoYeuCauRoute
   '/phieu/$id': typeof AuthenticatedPhieuIdRoute
+  '/quan-tri/lich-lam-viec': typeof AuthenticatedQuanTriLichLamViecRoute
   '/quan-tri/nhat-ky': typeof AuthenticatedQuanTriNhatKyRoute
   '/quan-tri/tai-khoan': typeof AuthenticatedQuanTriTaiKhoanRoute
   '/thiet-bi/$id': typeof AuthenticatedThietBiIdRoute
@@ -241,6 +249,7 @@ export interface FileRoutesByTo {
   '/kho/nhap': typeof AuthenticatedKhoNhapRoute
   '/kho/yeu-cau': typeof AuthenticatedKhoYeuCauRoute
   '/phieu/$id': typeof AuthenticatedPhieuIdRoute
+  '/quan-tri/lich-lam-viec': typeof AuthenticatedQuanTriLichLamViecRoute
   '/quan-tri/nhat-ky': typeof AuthenticatedQuanTriNhatKyRoute
   '/quan-tri/tai-khoan': typeof AuthenticatedQuanTriTaiKhoanRoute
   '/thiet-bi/$id': typeof AuthenticatedThietBiIdRoute
@@ -273,6 +282,7 @@ export interface FileRoutesById {
   '/_authenticated/kho/nhap': typeof AuthenticatedKhoNhapRoute
   '/_authenticated/kho/yeu-cau': typeof AuthenticatedKhoYeuCauRoute
   '/_authenticated/phieu/$id': typeof AuthenticatedPhieuIdRoute
+  '/_authenticated/quan-tri/lich-lam-viec': typeof AuthenticatedQuanTriLichLamViecRoute
   '/_authenticated/quan-tri/nhat-ky': typeof AuthenticatedQuanTriNhatKyRoute
   '/_authenticated/quan-tri/tai-khoan': typeof AuthenticatedQuanTriTaiKhoanRoute
   '/_authenticated/thiet-bi/$id': typeof AuthenticatedThietBiIdRoute
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/kho/nhap'
     | '/kho/yeu-cau'
     | '/phieu/$id'
+    | '/quan-tri/lich-lam-viec'
     | '/quan-tri/nhat-ky'
     | '/quan-tri/tai-khoan'
     | '/thiet-bi/$id'
@@ -335,6 +346,7 @@ export interface FileRouteTypes {
     | '/kho/nhap'
     | '/kho/yeu-cau'
     | '/phieu/$id'
+    | '/quan-tri/lich-lam-viec'
     | '/quan-tri/nhat-ky'
     | '/quan-tri/tai-khoan'
     | '/thiet-bi/$id'
@@ -366,6 +378,7 @@ export interface FileRouteTypes {
     | '/_authenticated/kho/nhap'
     | '/_authenticated/kho/yeu-cau'
     | '/_authenticated/phieu/$id'
+    | '/_authenticated/quan-tri/lich-lam-viec'
     | '/_authenticated/quan-tri/nhat-ky'
     | '/_authenticated/quan-tri/tai-khoan'
     | '/_authenticated/thiet-bi/$id'
@@ -556,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPhieuIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/quan-tri/lich-lam-viec': {
+      id: '/_authenticated/quan-tri/lich-lam-viec'
+      path: '/quan-tri/lich-lam-viec'
+      fullPath: '/quan-tri/lich-lam-viec'
+      preLoaderRoute: typeof AuthenticatedQuanTriLichLamViecRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/quan-tri/nhat-ky': {
       id: '/_authenticated/quan-tri/nhat-ky'
       path: '/quan-tri/nhat-ky'
@@ -609,6 +629,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedKhoNhapRoute: typeof AuthenticatedKhoNhapRoute
   AuthenticatedKhoYeuCauRoute: typeof AuthenticatedKhoYeuCauRoute
   AuthenticatedPhieuIdRoute: typeof AuthenticatedPhieuIdRoute
+  AuthenticatedQuanTriLichLamViecRoute: typeof AuthenticatedQuanTriLichLamViecRoute
   AuthenticatedQuanTriNhatKyRoute: typeof AuthenticatedQuanTriNhatKyRoute
   AuthenticatedQuanTriTaiKhoanRoute: typeof AuthenticatedQuanTriTaiKhoanRoute
   AuthenticatedThietBiIdRoute: typeof AuthenticatedThietBiIdRoute
@@ -634,6 +655,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedKhoNhapRoute: AuthenticatedKhoNhapRoute,
   AuthenticatedKhoYeuCauRoute: AuthenticatedKhoYeuCauRoute,
   AuthenticatedPhieuIdRoute: AuthenticatedPhieuIdRoute,
+  AuthenticatedQuanTriLichLamViecRoute: AuthenticatedQuanTriLichLamViecRoute,
   AuthenticatedQuanTriNhatKyRoute: AuthenticatedQuanTriNhatKyRoute,
   AuthenticatedQuanTriTaiKhoanRoute: AuthenticatedQuanTriTaiKhoanRoute,
   AuthenticatedThietBiIdRoute: AuthenticatedThietBiIdRoute,

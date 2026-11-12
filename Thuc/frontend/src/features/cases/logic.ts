@@ -1,6 +1,7 @@
 import { PARAMS } from '@/domain/params'
 import type { User, WarrantyCase, WorkOrder } from '@/domain/types'
 import type { Db } from '@/mock/db'
+import { openChange } from '@/api/service'
 
 // Ai được mở chi tiết phiếu (ma trận phân quyền 5.3; AT-14: từ chối kể cả khi biết mã phiếu).
 export function canViewCase(me: User, c: WarrantyCase, wo?: WorkOrder) {
@@ -36,6 +37,10 @@ export type ActionKey =
   | 'assignRepair'
   | 'startRepair'
   | 'finishRepair'
+  | 'planChange'
+  | 'planReview'
+  | 'planSendQuote'
+  | 'planResponse'
   | 'qc'
   | 'returnConfirm'
   | 'handover'
@@ -74,6 +79,12 @@ export function nextActions(me: User, c: WarrantyCase, wo: WorkOrder | undefined
       if (c.status === 'QUOTED') a.push({ key: 'quoteResponse', label: 'Ghi nhận phản hồi của khách', primary: true })
       if (c.status === 'RETURN_PENDING') a.push({ key: 'returnConfirm', label: 'Kết luận trả không sửa', primary: true })
       if (c.status === 'COMPLETED') a.push({ key: 'complaint', label: 'Ghi nhận khiếu nại' })
+      if (c.status === 'IN_REPAIR') {
+        const ch = openChange(c)
+        if (ch?.status === 'CHO_CSKH') a.push({ key: 'planReview', label: 'Xét đề xuất đổi phương án', primary: true })
+        if (ch?.status === 'CHO_GUI') a.push({ key: 'planSendQuote', label: 'Gửi báo giá bổ sung đã duyệt', primary: true })
+        if (ch?.status === 'CHO_KHACH') a.push({ key: 'planResponse', label: 'Ghi nhận phản hồi báo giá bổ sung', primary: true })
+      }
       break
     case 'DP':
       if (c.status === 'PRECHECK') a.push({ key: 'assignDiagnosis', label: 'Giao kỹ thuật viên chẩn đoán', primary: true })
@@ -87,8 +98,22 @@ export function nextActions(me: User, c: WarrantyCase, wo: WorkOrder | undefined
         const missing = wo.parts.some((p) => p.issued < p.qty)
         if (c.status === 'ASSIGNED' || c.status === 'REWORK')
           a.push({ key: 'startRepair', label: c.status === 'REWORK' ? 'Nhận xử lý lại' : 'Bắt đầu sửa', primary: true, disabled: missing ? 'Chưa nhận đủ linh kiện từ kho (BR-13).' : undefined })
-        if (c.status === 'IN_REPAIR')
-          a.push({ key: 'finishRepair', label: 'Hoàn tất, chuyển QC', primary: true, disabled: wo.tasks.some((t) => !t.done) ? 'Còn công việc chưa đánh dấu hoàn thành (BR-19).' : undefined })
+        if (c.status === 'IN_REPAIR') {
+          const ch = openChange(c)
+          a.push({
+            key: 'finishRepair',
+            label: 'Hoàn tất, chuyển QC',
+            primary: true,
+            disabled: ch
+              ? 'Đang chờ xác nhận đổi phương án (BR-12).'
+              : wo.tasks.some((t) => !t.done)
+                ? 'Còn công việc chưa đánh dấu hoàn thành (BR-19).'
+                : missing
+                  ? 'Chưa nhận đủ linh kiện bổ sung từ kho.'
+                  : undefined,
+          })
+          a.push({ key: 'planChange', label: 'Đề xuất đổi phương án', disabled: ch ? 'Đã có đề xuất đang chờ xử lý.' : undefined })
+        }
       }
       break
     case 'KHO':

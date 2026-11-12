@@ -89,10 +89,11 @@ export function WoParts({ wo, compact }: { wo: WorkOrder; compact?: boolean }) {
             </Button>
           )}
           {canIssue && (
-            <Button size='sm' variant={needReserve ? 'outline' : 'default'} disabled={issue.isPending} onClick={() => issue.mutate([me, wo.id])}>
+            <Button size='sm' variant={needReserve ? 'outline' : 'default'} disabled={issue.isPending || !wo.technicianId} onClick={() => issue.mutate([me, wo.id])}>
               Cấp phát cho kỹ thuật viên
             </Button>
           )}
+          {canIssue && !wo.technicianId && <p className='text-muted-foreground self-center text-xs'>Chờ điều phối phân công kỹ thuật viên rồi mới cấp phát (BR-15).</p>}
         </div>
       )}
       {shortOpen && <Shortage wo={wo} onClose={() => setShortOpen(false)} />}

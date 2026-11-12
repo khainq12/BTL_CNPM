@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { NativeSelect } from '@/components/form-kit'
 import { Empty, Guard, PageShell, useName } from '@/components/woms'
 
-const ENTITY: Record<AuditEntry['entity'], string> = { PHIEU: 'Phiếu', WO: 'Lệnh sửa chữa', KHO: 'Kho', PHE_DUYET: 'Phê duyệt', TAI_KHOAN: 'Tài khoản', KHIEU_NAI: 'Khiếu nại', PHIEN: 'Đăng nhập' }
+const ENTITY: Record<AuditEntry['entity'], string> = { PHIEU: 'Phiếu', WO: 'Lệnh sửa chữa', KHO: 'Kho', PHE_DUYET: 'Phê duyệt', TAI_KHOAN: 'Tài khoản', KHIEU_NAI: 'Khiếu nại', PHIEN: 'Đăng nhập', CAU_HINH: 'Cấu hình' }
 
 // Nhật ký thao tác (BR-28, NFR-02): chỉ đọc, không ai sửa được.
 export function AuditLog() {

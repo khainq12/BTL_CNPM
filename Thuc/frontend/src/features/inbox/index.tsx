@@ -6,6 +6,7 @@ import { ROLE_LABEL } from '@/domain/roles'
 import { SLA_RANK, slaInfo } from '@/domain/sla'
 import type { WarrantyCase } from '@/domain/types'
 import { canSeeCustomer } from '@/features/cases/logic'
+import { openChange } from '@/api/service'
 import { Button } from '@/components/ui/button'
 import { CaseLink, Empty, PageShell, Pill, SlaBadge, StatusBadge } from '@/components/woms'
 
@@ -35,6 +36,7 @@ export function Inbox() {
       q.push(
         { title: 'Cần kiểm tra bảo hành sơ bộ', rows: by('RECEIVED'), empty: 'Không có phiếu mới cần kiểm tra.' },
         { title: 'Cần kết luận bảo hành', hint: 'Đã có biên bản chẩn đoán hoặc quyết định của quản lý.', rows: by('ELIGIBILITY_REVIEW'), empty: 'Không có phiếu chờ kết luận.' },
+        { title: 'Đổi phương án khi đang sửa', hint: 'Kỹ thuật viên đề xuất, cần xét lại bảo hành và báo giá (BR-12).', rows: db.cases.filter((c) => ['CHO_CSKH', 'CHO_GUI', 'CHO_KHACH'].includes(openChange(c)?.status ?? '')), empty: 'Không có đề xuất đổi phương án.' },
         { title: 'Chờ khách xác nhận báo giá', hint: `Quá ${PARAMS.quoteWaitDays} ngày làm việc chưa phản hồi thì gọi lại khách (PARAM-04).`, rows: by('QUOTED'), empty: 'Không có báo giá đang chờ.' },
         { title: 'Chờ khách bổ sung thông tin', rows: by('WAITING_INFORMATION'), empty: 'Không có phiếu chờ bổ sung.' },
         { title: 'Chuẩn bị trả không sửa', rows: by('RETURN_PENDING'), empty: 'Không có phiếu cần kết luận trả máy.' },
@@ -45,6 +47,7 @@ export function Inbox() {
       q.push(
         { title: 'Chờ giao kỹ thuật viên chẩn đoán', rows: by('PRECHECK'), empty: 'Không có phiếu chờ giao chẩn đoán.', link: { to: '/dieu-phoi', label: 'Bảng điều phối' } },
         { title: 'Sẵn sàng sửa, chờ phân công', rows: by('READY_TO_REPAIR'), empty: 'Không có lệnh sửa chữa chờ phân công.', link: { to: '/dieu-phoi', label: 'Bảng điều phối' } },
+        { title: 'Đang chờ xác nhận đổi phương án', hint: 'Kỹ thuật viên tạm ngừng cho tới khi CSKH và khách xác nhận (BR-12).', rows: db.cases.filter((c) => !!openChange(c)), empty: 'Không có lệnh đang chờ đổi phương án.' },
         { title: 'Sắp quá hạn và quá hạn', hint: 'Cảnh báo khi còn 4 giờ làm việc (PARAM-09).', rows: urgent, empty: 'Không có phiếu nào sắp quá hạn.' },
         { title: `Chờ linh kiện quá ${PARAMS.partWaitWarnDays} ngày`, rows: by('WAITING_PARTS').filter((c) => since(c.sla.pauses.at(-1)?.start) >= PARAMS.partWaitWarnDays), empty: 'Không có lệnh chờ linh kiện quá lâu.' }
       )

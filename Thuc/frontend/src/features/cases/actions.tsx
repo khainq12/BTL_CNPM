@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { AlertTriangle, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
 import { fmtMoney } from '@/domain/format'
@@ -16,16 +16,17 @@ import {
   suggestRule,
   warrantyAuto,
 } from '@/domain/rules'
-import type { CauseType, EligibilityDecision, QcItem, WarrantyCase, WarrantyCheck, WorkOrder } from '@/domain/types'
+import type { CauseType, EligibilityDecision, Photo, QcItem, WarrantyCase, WarrantyCheck, WorkOrder } from '@/domain/types'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
 import { CancelButton, Field, FormDialog, FormSheet, NativeSelect, SubmitButton } from '@/components/form-kit'
 import { InfoList } from '@/components/woms'
+import { PartRows, QuoteBuilder, TaskRows, quoteTotal } from './editors'
 import { techLoad, type ActionKey } from './logic'
+import { PlanChangeDialog } from './plan-change'
 import { PhotoPicker } from './photo-picker'
 
 type P = { c: WarrantyCase; wo?: WorkOrder; onClose: () => void }
@@ -41,7 +42,7 @@ function AcceptOnline({ c, onClose }: P) {
   const [condition, setCondition] = useState('')
   const [acc, setAcc] = useState<string[]>([])
   const [none, setNone] = useState(false)
-  const [photos, setPhotos] = useState<File[]>([])
+  const [photos, setPhotos] = useState<Photo[]>([])
   const [tried, setTried] = useState(false)
   const m = useCaseAction(api.acceptOnline, 'Đã nhận máy và lập biên nhận', onClose)
   const errs = { condition: !condition.trim() && 'Mô tả tình trạng bên ngoài.', acc: !none && acc.length === 0 && 'Chọn phụ kiện hoặc "Không có phụ kiện".', photos: photos.length === 0 && 'Chụp ít nhất 1 ảnh hiện trạng.' }
@@ -55,7 +56,7 @@ function AcceptOnline({ c, onClose }: P) {
       onSubmit={() => {
         setTried(true)
         if (Object.values(errs).some(Boolean)) return
-        m.mutate([me, c.id, c.version, { condition, accessories: acc, noAccessories: none, photos: photos.map((f) => f.name) }])
+        m.mutate([me, c.id, c.version, { condition, accessories: acc, noAccessories: none, photos }])
       }}
       footer={
         <>
@@ -68,7 +69,7 @@ function AcceptOnline({ c, onClose }: P) {
         {(id) => <Textarea id={id} rows={2} value={condition} onChange={(e) => setCondition(e.target.value)} placeholder='Trầy góc trái nắp máy, đủ phím.' />}
       </Field>
       <AccessoryPicker value={acc} onChange={setAcc} none={none} onNone={setNone} error={tried && errs.acc} />
-      <PhotoPicker files={photos} onChange={setPhotos} error={tried && errs.photos} />
+      <PhotoPicker value={photos} onChange={setPhotos} error={tried && errs.photos} />
     </FormDialog>
   )
 }
@@ -310,7 +311,6 @@ function Assign({ c, wo, onClose, kind }: P & { kind: 'diagnosis' | 'repair' }) 
 
 function Diagnosis({ c, onClose }: P) {
   const me = useMe()
-  const db = useDb()
   const [cause, setCause] = useState('')
   const [causeType, setCauseType] = useState<CauseType>('PHAN_CUNG')
   const [severity, setSeverity] = useState<'NHE' | 'TRUNG_BINH' | 'NANG'>('NHE')
@@ -382,48 +382,8 @@ function Diagnosis({ c, onClose }: P) {
           <Field label='Phương án sửa' required error={tried && errs.plan}>
             {(id) => <Textarea id={id} rows={2} value={plan} onChange={(e) => setPlan(e.target.value)} />}
           </Field>
-          <fieldset className='grid gap-2'>
-            <legend className='mb-1 text-sm font-medium'>Công việc dự kiến</legend>
-            {tasks.map((t, i) => (
-              <div key={i} className='flex gap-2'>
-                <Input aria-label={`Công việc ${i + 1}`} value={t.title} placeholder='Thay bàn phím' onChange={(e) => setTasks(tasks.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
-                <Input aria-label={`Số phút công việc ${i + 1}`} type='number' min={5} className='w-24' value={t.minutes} onChange={(e) => setTasks(tasks.map((x, j) => (j === i ? { ...x, minutes: Number(e.target.value) } : x)))} />
-                <Button type='button' variant='ghost' size='icon' aria-label='Xóa công việc' onClick={() => setTasks(tasks.filter((_, j) => j !== i))}>
-                  <Trash2 />
-                </Button>
-              </div>
-            ))}
-            {tried && errs.tasks && <p className='text-destructive text-xs'>{errs.tasks}</p>}
-            <Button type='button' variant='outline' size='sm' className='justify-self-start' onClick={() => setTasks([...tasks, { title: '', minutes: 30 }])}>
-              <Plus /> Thêm công việc
-            </Button>
-          </fieldset>
-          <fieldset className='grid gap-2'>
-            <legend className='mb-1 text-sm font-medium'>Linh kiện dự kiến</legend>
-            {parts.map((p, i) => {
-              const part = db.parts.find((x) => x.id === p.partId)
-              return (
-                <div key={i} className='flex items-center gap-2'>
-                  <NativeSelect aria-label={`Linh kiện ${i + 1}`} value={p.partId} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, partId: e.target.value } : x)))}>
-                    <option value=''>Chọn linh kiện</option>
-                    {db.parts.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.sku} · {x.name} (khả dụng {x.onHand - x.reserved})
-                      </option>
-                    ))}
-                  </NativeSelect>
-                  <Input aria-label='Số lượng' type='number' min={1} className='w-20' value={p.qty} onChange={(e) => setParts(parts.map((x, j) => (j === i ? { ...x, qty: Math.max(1, Number(e.target.value)) } : x)))} />
-                  <span className='text-muted-foreground w-28 shrink-0 text-right text-xs'>{part ? fmtMoney(part.price * p.qty) : ''}</span>
-                  <Button type='button' variant='ghost' size='icon' aria-label='Xóa linh kiện' onClick={() => setParts(parts.filter((_, j) => j !== i))}>
-                    <Trash2 />
-                  </Button>
-                </div>
-              )
-            })}
-            <Button type='button' variant='outline' size='sm' className='justify-self-start' onClick={() => setParts([...parts, { partId: '', qty: 1 }])}>
-              <Plus /> Thêm linh kiện
-            </Button>
-          </fieldset>
+          <TaskRows label='Công việc dự kiến' value={tasks} onChange={setTasks} error={tried && errs.tasks} />
+          <PartRows label='Linh kiện dự kiến' value={parts} onChange={setParts} />
           <Field label='Tiền công ước tính (nếu sửa có phí)' hint='Để 0 nếu dự kiến bảo hành miễn phí.'>
             {(id) => <Input id={id} type='number' min={0} step={10000} value={labor} onChange={(e) => setLabor(Number(e.target.value))} className='w-48' />}
           </Field>
@@ -457,7 +417,7 @@ function Eligibility({ c, onClose }: P) {
   const [labor, setLabor] = useState(d.laborEstimate)
   const [tried, setTried] = useState(false)
   const m = useCaseAction(api.decideEligibility, 'Đã lưu kết luận bảo hành', onClose)
-  const total = useMemo(() => items.reduce((s, i) => s + i.qty * i.unitPrice, 0) + labor, [items, labor])
+  const total = quoteTotal(items, labor)
   const allowed: EligibilityDecision[] = !d.repairable ? ['KHONG_SUA'] : exceptionDone === false ? ['CO_PHI', 'KHONG_SUA'] : exceptionDone === true ? ['MIEN_PHI', 'CO_PHI', 'KHONG_SUA'] : ['MIEN_PHI', 'CO_PHI', 'NGOAI_LE', 'KHONG_SUA']
   return (
     <FormSheet
@@ -523,35 +483,7 @@ function Eligibility({ c, onClose }: P) {
       <Field label='Lý do, căn cứ' required error={tried && !reason.trim() && 'Ghi lý do kết luận (BR-05).'}>
         {(id) => <Textarea id={id} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />}
       </Field>
-      {decision === 'CO_PHI' && (
-        <fieldset className='grid gap-2'>
-          <legend className='mb-1 text-sm font-medium'>Báo giá v{c.quotes.length + 1}</legend>
-          {items.map((it, i) => (
-            <div key={i} className='flex gap-2'>
-              <Input aria-label='Hạng mục' value={it.label} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-              <Input aria-label='Số lượng' type='number' min={1} className='w-16' value={it.qty} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) } : x)))} />
-              <Input aria-label='Đơn giá' type='number' min={0} step={10000} className='w-36' value={it.unitPrice} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, unitPrice: Number(e.target.value) } : x)))} />
-              <Button type='button' variant='ghost' size='icon' aria-label='Xóa hạng mục' onClick={() => setItems(items.filter((_, j) => j !== i))}>
-                <Trash2 />
-              </Button>
-            </div>
-          ))}
-          <Button type='button' variant='outline' size='sm' className='justify-self-start' onClick={() => setItems([...items, { label: '', qty: 1, unitPrice: 0 }])}>
-            <Plus /> Thêm hạng mục
-          </Button>
-          <div className='flex items-center gap-2'>
-            <span className='text-sm'>Tiền công</span>
-            <Input aria-label='Tiền công' type='number' min={0} step={10000} className='w-36' value={labor} onChange={(e) => setLabor(Number(e.target.value))} />
-          </div>
-          <p className='text-right font-semibold tabular-nums'>Tổng {fmtMoney(total)}</p>
-          {total > PARAMS.quoteApprovalThreshold && (
-            <Alert>
-              <AlertTriangle />
-              <AlertDescription>Tổng vượt {fmtMoney(PARAMS.quoteApprovalThreshold)}: báo giá phải được quản lý duyệt trước khi gửi khách (BR-07).</AlertDescription>
-            </Alert>
-          )}
-        </fieldset>
-      )}
+      {decision === 'CO_PHI' && <QuoteBuilder title={`Báo giá v${c.quotes.length + 1}`} items={items} onItems={setItems} labor={labor} onLabor={setLabor} />}
     </FormSheet>
   )
 }
@@ -728,6 +660,7 @@ function Qc({ c, onClose }: P) {
   const device = db.devices.find((d) => d.id === c.deviceId)!
   const [items, setItems] = useState<QcItem[]>(QC_CHECKLIST[device.kind].map((i) => ({ ...i, pass: false, note: '' })))
   const [defect, setDefect] = useState('')
+  const [photos, setPhotos] = useState<Photo[]>([])
   const [tried, setTried] = useState(false)
   const m = useCaseAction(api.submitQc, 'Đã lưu kết quả kiểm tra', onClose)
   const pass = items.every((i) => !i.mandatory || i.pass)
@@ -741,7 +674,7 @@ function Qc({ c, onClose }: P) {
       onSubmit={() => {
         setTried(true)
         if (!pass && !defect.trim()) return
-        m.mutate([me, c.id, c.version, items, defect])
+        m.mutate([me, c.id, c.version, items, defect, photos])
       }}
       footer={
         <>
@@ -755,7 +688,7 @@ function Qc({ c, onClose }: P) {
       <p className='bg-muted rounded-md p-3 text-sm'>
         <span className='font-medium'>Lỗi ban đầu:</span> {c.symptom}
         <br />
-        <span className='font-medium'>Đã làm:</span> {c.diagnosis?.plan}
+        <span className='font-medium'>Đã làm:</span> {api.currentPlan(c)}
         {c.reworkCount > 0 && (
           <>
             <br />
@@ -780,6 +713,7 @@ function Qc({ c, onClose }: P) {
           {(id) => <Textarea id={id} rows={2} value={defect} onChange={(e) => setDefect(e.target.value)} />}
         </Field>
       )}
+      <PhotoPicker label='Ảnh kết quả kiểm tra' required={false} max={4} hint='Không bắt buộc. Chụp khi cần chứng minh tình trạng sau kiểm tra, tối đa 4 ảnh.' value={photos} onChange={setPhotos} />
       {!pass && last && (
         <Alert>
           <AlertTriangle />
@@ -943,6 +877,11 @@ export function ActionDialog({ action, ...p }: P & { action: ActionKey }) {
       return <Handover {...p} />
     case 'complaint':
       return <Complaint {...p} />
+    case 'planChange':
+    case 'planReview':
+    case 'planSendQuote':
+    case 'planResponse':
+      return <PlanChangeDialog action={action} {...p} />
     default:
       return null
   }

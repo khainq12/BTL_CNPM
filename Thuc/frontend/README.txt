@@ -29,6 +29,8 @@ Mật khẩu chung: xem hằng DEMO_PASSWORD trong src/mock/seed.ts
   tiepnhan2    Tài khoản đã khóa (để thử đăng nhập bị từ chối)
 
 Muốn đổi vai trò: đăng xuất rồi đăng nhập tài khoản khác.
+Gợi ý thử luồng đổi phương án (BR-12): đăng nhập ktv.an, mở phiếu CAS-20261106-0041 (đang sửa),
+bấm "Đề xuất đổi phương án"; sau đó đăng nhập cskh để xét đề xuất.
 Dữ liệu lưu trong localStorage của trình duyệt. Muốn quay về dữ liệu ban đầu: ở trang đăng nhập,
 bấm "Khôi phục dữ liệu mẫu".
 
@@ -58,4 +60,5 @@ MÀN HÌNH
   Kho: yêu cầu, tồn, nhập, kiểm kê, lịch sử
   Phê duyệt                   quản lý
   Khiếu nại                   CSKH, quản lý
-  Tài khoản, nhật ký thao tác quản lý
+  Tài khoản, lịch làm việc,   quản lý
+  nhật ký thao tác

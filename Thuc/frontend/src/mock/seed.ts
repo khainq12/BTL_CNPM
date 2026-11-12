@@ -1,0 +1,201 @@
+import type {
+  Approval,
+  AuditEntry,
+  CaseStatus,
+  Complaint,
+  Customer,
+  Device,
+  Part,
+  StockMove,
+  User,
+  WarrantyCase,
+  WorkOrder,
+} from '@/domain/types'
+
+// Dữ liệu giả để chạy thử khi chưa có backend (TV4). Mật khẩu là giá trị thử nghiệm,
+// dùng chung cho mọi tài khoản mẫu: DEMO_PASSWORD bên dưới.
+export const DEMO_PASSWORD = 'Woms@2026'
+
+const H = 60 * 60 * 1000
+const ago = (hours: number) => new Date(Date.now() - hours * H).toISOString()
+
+export const users: User[] = [
+  { id: 'u-tn', username: 'tiepnhan', name: 'Lê Thu Hà', role: 'TN', phone: '0901000001' },
+  { id: 'u-cskh', username: 'cskh', name: 'Phạm Minh Châu', role: 'CSKH', phone: '0901000002' },
+  { id: 'u-dp', username: 'dieuphoi', name: 'Vũ Đức Thắng', role: 'DP', phone: '0901000003' },
+  { id: 'u-ktv1', username: 'ktv.an', name: 'Nguyễn Văn An', role: 'KTV', phone: '0901000004' },
+  { id: 'u-ktv2', username: 'ktv.binh', name: 'Trần Quốc Bình', role: 'KTV', phone: '0901000005' },
+  { id: 'u-ktv3', username: 'ktv.cuong', name: 'Đỗ Mạnh Cường', role: 'KTV', phone: '0901000006' },
+  { id: 'u-kho', username: 'kho', name: 'Hoàng Thị Lan', role: 'KHO', phone: '0901000007' },
+  { id: 'u-qc', username: 'qc', name: 'Bùi Thanh Tùng', role: 'QC', phone: '0901000008' },
+  { id: 'u-ql', username: 'quanly', name: 'Đặng Thị Hương', role: 'QL', phone: '0901000009' },
+  { id: 'u-tn2', username: 'tiepnhan2', name: 'Ngô Văn Khoa', role: 'TN', phone: '0901000010' },
+].map((u) => ({ ...u, password: DEMO_PASSWORD, active: u.id !== 'u-tn2' })) as User[]
+
+export const customers: Customer[] = [
+  { id: 'c1', name: 'Nguyễn Thị Mai', phone: '0912345678', email: 'mai.nguyen@example.com' },
+  { id: 'c2', name: 'Trần Văn Hùng', phone: '0987654321' },
+  { id: 'c3', name: 'Công ty TNHH Minh Phát', phone: '0243555888', email: 'it@minhphat.example.com' },
+  { id: 'c4', name: 'Lý Gia Bảo', phone: '0938111222' },
+  { id: 'c5', name: 'Phan Thị Ngọc', phone: '0976333444', email: 'ngoc.phan@example.com' },
+  { id: 'c6', name: 'Hồ Quang Vinh', phone: '0909555666' },
+  { id: 'c7', name: 'Đinh Thu Trang', phone: '0918777888' },
+  { id: 'c8', name: 'Mai Xuân Phúc', phone: '0965999000' },
+]
+
+const dev = (id: string, customerId: string, kind: Device['kind'], brand: string, model: string, serial: string, purchasedMonthsAgo?: number): Device => ({
+  id,
+  customerId,
+  kind,
+  brand,
+  model,
+  serial,
+  purchaseDate: purchasedMonthsAgo === undefined ? undefined : ago(purchasedMonthsAgo * 730),
+  warrantyMonths: 12,
+  policyCode: 'BH-TC-2026',
+})
+
+export const devices: Device[] = [
+  dev('d1', 'c1', 'laptop', 'Dell', 'Latitude 5420', 'C02XK1ABJG5H', 5),
+  dev('d2', 'c2', 'laptop', 'HP', 'ProBook 450 G9', '5CD2391LKQ', 14),
+  dev('d3', 'c3', 'printer', 'Canon', 'LBP 2900', 'CN-29-778812', 8),
+  dev('d4', 'c3', 'pc', 'Lenovo', 'ThinkCentre M70s', 'PC0X9Y7Z', 3),
+  dev('d5', 'c4', 'laptop', 'Asus', 'VivoBook 15 X1504', 'N3NRCV05A123', 2),
+  dev('d6', 'c5', 'laptop', 'Acer', 'Aspire 7 A715', 'NHQGBSV00412', 10),
+  dev('d7', 'c6', 'laptop', 'Lenovo', 'IdeaPad Slim 5', 'PF4KX2QZ'),
+  dev('d8', 'c7', 'printer', 'HP', 'LaserJet M211dw', 'VNB3K12345', 20),
+  dev('d9', 'c8', 'laptop', 'MSI', 'Modern 14 C12M', 'K2307N0012345', 7),
+  dev('d10', 'c1', 'pc', 'Dell', 'OptiPlex 3000', '7H2KLM3', 11),
+  dev('d11', 'c2', 'laptop', 'HP', 'ProBook 450 G10', '5CD4127XWP', 4),
+]
+
+export const parts: Part[] = [
+  { id: 'p1', sku: 'LK-SSD-512', name: 'SSD NVMe 512GB', unit: 'cái', onHand: 8, reserved: 1, location: 'Kệ A1', price: 1_250_000, fits: 'Laptop, PC' },
+  { id: 'p2', sku: 'LK-RAM-8D4', name: 'RAM DDR4 8GB 3200', unit: 'thanh', onHand: 12, reserved: 0, location: 'Kệ A2', price: 650_000, fits: 'Laptop, PC' },
+  { id: 'p3', sku: 'LK-PIN-DL54', name: 'Pin Dell Latitude 54xx', unit: 'cái', onHand: 2, reserved: 1, location: 'Kệ B1', price: 1_450_000, fits: 'Dell Latitude 5420/5430' },
+  { id: 'p4', sku: 'LK-BP-HP450', name: 'Bàn phím HP ProBook 450', unit: 'cái', onHand: 0, reserved: 0, location: 'Kệ B2', price: 850_000, fits: 'HP ProBook 450 G8/G9' },
+  { id: 'p5', sku: 'LK-MH-156', name: 'Màn hình 15.6" FHD IPS', unit: 'tấm', onHand: 3, reserved: 0, location: 'Kệ C1', price: 2_350_000, fits: 'Laptop 15.6"' },
+  { id: 'p6', sku: 'LK-SAC-65W', name: 'Adapter 65W Type-C', unit: 'cái', onHand: 6, reserved: 0, location: 'Kệ A3', price: 420_000, fits: 'Laptop Type-C' },
+  { id: 'p7', sku: 'LK-QUAT-AS', name: 'Quạt tản nhiệt Asus VivoBook', unit: 'cái', onHand: 4, reserved: 0, location: 'Kệ B3', price: 380_000, fits: 'Asus VivoBook 14/15' },
+  { id: 'p8', sku: 'LK-TRUC-CN', name: 'Trục sấy Canon LBP 2900', unit: 'cái', onHand: 1, reserved: 1, location: 'Kệ D1', price: 690_000, fits: 'Canon LBP 2900/3000' },
+  { id: 'p9', sku: 'LK-MAIN-ACR', name: 'Mainboard Acer Aspire 7', unit: 'cái', onHand: 1, reserved: 0, location: 'Kệ C2', price: 4_800_000, fits: 'Acer Aspire 7 A715' },
+  { id: 'p10', sku: 'LK-KEO-TN', name: 'Keo tản nhiệt', unit: 'tuýp', onHand: 20, reserved: 0, location: 'Kệ A4', price: 60_000, fits: 'Mọi thiết bị' },
+  { id: 'p11', sku: 'LK-ROLL-HP', name: 'Bộ con lăn kéo giấy HP M211', unit: 'bộ', onHand: 3, reserved: 0, location: 'Kệ D2', price: 320_000, fits: 'HP LaserJet M211' },
+]
+
+type CaseSeed = Partial<WarrantyCase> & { id: string; code: string; status: CaseStatus; customerId: string; deviceId: string }
+
+function mk(s: CaseSeed): WarrantyCase {
+  return {
+    version: 1,
+    channel: 'QUAY',
+    symptom: '',
+    condition: 'Nguyên vẹn',
+    accessories: ['Sạc / adapter'],
+    noAccessories: false,
+    photos: ['mat-truoc.jpg', 'mat-sau.jpg'],
+    createdAt: ago(30),
+    receivedAt: ago(30),
+    receivedBy: 'u-tn',
+    quotes: [],
+    reworkCount: 0,
+    qc: [],
+    sla: { pauses: [] },
+    events: [],
+    ...s,
+  }
+}
+
+const pre = (warranty: 'CON_HAN' | 'HET_HAN' | 'CHUA_DU_THONG_TIN', h: number) => ({ warranty, note: 'Đã đối chiếu dữ liệu bảo hành theo serial.', by: 'u-cskh', at: ago(h) })
+
+export const cases: WarrantyCase[] = [
+  mk({ id: 'k1', code: 'CAS-20261112-0101', status: 'PENDING_ACCEPT', channel: 'ONLINE', customerId: 'c6', deviceId: 'd7', symptom: 'Máy tự tắt khi đang dùng khoảng 10 phút, quạt kêu to.', condition: '', accessories: [], photos: [], createdAt: ago(5), receivedAt: undefined, receivedBy: undefined }),
+  mk({ id: 'k2', code: 'CAS-20261112-0102', status: 'RECEIVED', customerId: 'c4', deviceId: 'd5', symptom: 'Không lên nguồn sau khi cập nhật Windows.', condition: 'Trầy nhẹ góc phải nắp máy.', createdAt: ago(2), receivedAt: ago(2) }),
+  mk({ id: 'k3', code: 'CAS-20261111-0094', status: 'PRECHECK', customerId: 'c1', deviceId: 'd1', symptom: 'Pin chai, chỉ dùng được 20 phút.', precheck: pre('CON_HAN', 20), createdAt: ago(26) }),
+  mk({ id: 'k4', code: 'CAS-20261110-0081', status: 'WAITING_INFORMATION', customerId: 'c8', deviceId: 'd9', symptom: 'Bản lề màn hình gãy bên trái.', precheck: pre('CHUA_DU_THONG_TIN', 40), infoRequest: 'Không tìm thấy serial trong dữ liệu bảo hành. Đề nghị khách gửi ảnh hóa đơn mua hàng.', createdAt: ago(50) }),
+  mk({ id: 'k5', code: 'CAS-20261111-0090', status: 'DIAGNOSING', customerId: 'c3', deviceId: 'd3', symptom: 'In bị nhòe mực, có vệt đen dọc trang.', accessories: ['Cáp nguồn'], precheck: pre('CON_HAN', 28), diagnosisTechId: 'u-ktv1', createdAt: ago(30) }),
+  mk({
+    id: 'k6', code: 'CAS-20261110-0077', status: 'ELIGIBILITY_REVIEW', customerId: 'c2', deviceId: 'd2', symptom: 'Bàn phím liệt nhiều phím sau khi đổ cà phê.', precheck: pre('HET_HAN', 48), diagnosisTechId: 'u-ktv2', createdAt: ago(52),
+    diagnosis: { cause: 'Chất lỏng tràn vào làm chập mạch bàn phím.', causeType: 'NUOC_ROI_VO', severity: 'TRUNG_BINH', repairable: true, plan: 'Thay bàn phím, vệ sinh bo mạch.', tasks: [{ title: 'Tháo máy, vệ sinh bo mạch', minutes: 60 }, { title: 'Thay bàn phím', minutes: 45 }], parts: [{ partId: 'p4', qty: 1 }], laborEstimate: 300_000, by: 'u-ktv2', at: ago(24) },
+  }),
+  mk({
+    id: 'k7', code: 'CAS-20261109-0063', status: 'WAITING_APPROVAL', customerId: 'c5', deviceId: 'd6', symptom: 'Máy không lên hình, đèn nguồn sáng.', precheck: pre('CON_HAN', 70), diagnosisTechId: 'u-ktv3', createdAt: ago(75), pendingApprovalId: 'a1',
+    diagnosis: { cause: 'Mainboard hỏng chip đồ họa do va đập mạnh (có vết móp vỏ).', causeType: 'NUOC_ROI_VO', severity: 'NANG', repairable: true, plan: 'Thay mainboard.', tasks: [{ title: 'Thay mainboard', minutes: 120 }, { title: 'Cài đặt, chạy thử', minutes: 60 }], parts: [{ partId: 'p9', qty: 1 }], laborEstimate: 500_000, by: 'u-ktv3', at: ago(50) },
+    eligibility: { decision: 'CO_PHI', ruleCode: 'D4', reason: 'Lỗi do va đập, thuộc trường hợp loại trừ.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(30) },
+    quotes: [{ version: 1, items: [{ label: 'Mainboard Acer Aspire 7', qty: 1, unitPrice: 4_800_000 }], labor: 500_000, total: 5_300_000, status: 'CHO_DUYET', createdBy: 'u-cskh', createdAt: ago(30) }],
+  }),
+  mk({
+    id: 'k8', code: 'CAS-20261110-0072', status: 'QUOTED', customerId: 'c7', deviceId: 'd8', symptom: 'Kẹt giấy liên tục.', accessories: ['Cáp nguồn'], precheck: pre('HET_HAN', 60), diagnosisTechId: 'u-ktv1', createdAt: ago(62),
+    diagnosis: { cause: 'Con lăn kéo giấy mòn.', causeType: 'PHAN_CUNG', severity: 'NHE', repairable: true, plan: 'Thay bộ con lăn kéo giấy.', tasks: [{ title: 'Thay bộ con lăn', minutes: 40 }], parts: [{ partId: 'p11', qty: 1 }], laborEstimate: 150_000, by: 'u-ktv1', at: ago(40) },
+    eligibility: { decision: 'CO_PHI', ruleCode: 'D3', reason: 'Hết thời hạn bảo hành 12 tháng.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(26) },
+    quotes: [{ version: 1, items: [{ label: 'Bộ con lăn kéo giấy HP M211', qty: 1, unitPrice: 320_000 }], labor: 150_000, total: 470_000, status: 'DA_GUI', createdBy: 'u-cskh', createdAt: ago(26), sentAt: ago(26) }],
+  }),
+  mk({
+    id: 'k9', code: 'CAS-20261108-0055', status: 'WAITING_PARTS', customerId: 'c2', deviceId: 'd11', symptom: 'Bàn phím gõ không ăn một số phím.', precheck: pre('CON_HAN', 96), diagnosisTechId: 'u-ktv2', workOrderId: 'w1', createdAt: ago(100),
+    diagnosis: { cause: 'Bàn phím lỗi mạch.', causeType: 'PHAN_CUNG', severity: 'NHE', repairable: true, plan: 'Thay bàn phím.', tasks: [{ title: 'Thay bàn phím', minutes: 45 }], parts: [{ partId: 'p4', qty: 1 }], laborEstimate: 0, by: 'u-ktv2', at: ago(80) },
+    eligibility: { decision: 'MIEN_PHI', ruleCode: 'D1', reason: 'Còn hạn, lỗi phần cứng thuộc phạm vi.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(75) },
+    sla: { planConfirmedAt: ago(75), pauses: [{ reason: 'CHO_LINH_KIEN', start: ago(50) }] },
+  }),
+  mk({
+    id: 'k10', code: 'CAS-20261109-0068', status: 'READY_TO_REPAIR', customerId: 'c3', deviceId: 'd4', symptom: 'Máy chạy chậm, ổ cứng kêu lạch cạch.', precheck: pre('CON_HAN', 70), diagnosisTechId: 'u-ktv3', workOrderId: 'w2', createdAt: ago(72),
+    diagnosis: { cause: 'Ổ cứng có bad sector.', causeType: 'PHAN_CUNG', severity: 'TRUNG_BINH', repairable: true, plan: 'Thay SSD, cài lại hệ điều hành, chuyển dữ liệu.', tasks: [{ title: 'Sao lưu dữ liệu', minutes: 60 }, { title: 'Thay SSD', minutes: 30 }, { title: 'Cài đặt hệ điều hành', minutes: 60 }], parts: [{ partId: 'p1', qty: 1 }], laborEstimate: 0, by: 'u-ktv3', at: ago(60) },
+    eligibility: { decision: 'MIEN_PHI', ruleCode: 'D1', reason: 'Còn hạn, lỗi phần cứng.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(55) },
+    sla: { planConfirmedAt: ago(55), pauses: [] },
+  }),
+  mk({
+    id: 'k11', code: 'CAS-20261106-0041', status: 'IN_REPAIR', customerId: 'c1', deviceId: 'd10', symptom: 'Máy khởi động lại liên tục.', precheck: pre('CON_HAN', 140), diagnosisTechId: 'u-ktv1', workOrderId: 'w3', createdAt: ago(150),
+    diagnosis: { cause: 'Quá nhiệt do keo tản nhiệt khô.', causeType: 'PHAN_CUNG', severity: 'NHE', repairable: true, plan: 'Vệ sinh, thay keo tản nhiệt.', tasks: [{ title: 'Vệ sinh quạt, tản nhiệt', minutes: 40 }, { title: 'Thay keo tản nhiệt', minutes: 20 }, { title: 'Chạy thử tải nặng', minutes: 30 }], parts: [{ partId: 'p10', qty: 1 }], laborEstimate: 0, by: 'u-ktv1', at: ago(120) },
+    eligibility: { decision: 'MIEN_PHI', ruleCode: 'D1', reason: 'Còn hạn.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(118) },
+    sla: { planConfirmedAt: ago(118), pauses: [] },
+  }),
+  mk({
+    id: 'k12', code: 'CAS-20261107-0049', status: 'TESTING', customerId: 'c5', deviceId: 'd6', symptom: 'Adapter không sạc được.', precheck: pre('CON_HAN', 110), diagnosisTechId: 'u-ktv2', workOrderId: 'w4', createdAt: ago(115), reworkCount: 1,
+    diagnosis: { cause: 'Adapter hỏng.', causeType: 'PHAN_CUNG', severity: 'NHE', repairable: true, plan: 'Thay adapter.', tasks: [{ title: 'Thay adapter, kiểm tra cổng sạc', minutes: 20 }], parts: [{ partId: 'p6', qty: 1 }], laborEstimate: 0, by: 'u-ktv2', at: ago(100) },
+    eligibility: { decision: 'MIEN_PHI', ruleCode: 'D1', reason: 'Còn hạn.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(98) },
+    qc: [{ round: 1, pass: false, defect: 'Cổng sạc lỏng, sạc chập chờn.', items: [], by: 'u-qc', at: ago(40) }],
+    sla: { planConfirmedAt: ago(98), pauses: [] },
+  }),
+  mk({
+    id: 'k13', code: 'CAS-20261105-0032', status: 'READY_FOR_DELIVERY', customerId: 'c4', deviceId: 'd5', symptom: 'Quạt kêu to, máy nóng.', precheck: pre('CON_HAN', 160), diagnosisTechId: 'u-ktv3', workOrderId: 'w5', createdAt: ago(170), readyAt: ago(20),
+    diagnosis: { cause: 'Quạt tản nhiệt hỏng bạc đạn.', causeType: 'PHAN_CUNG', severity: 'NHE', repairable: true, plan: 'Thay quạt.', tasks: [{ title: 'Thay quạt tản nhiệt', minutes: 40 }], parts: [{ partId: 'p7', qty: 1 }], laborEstimate: 0, by: 'u-ktv3', at: ago(150) },
+    eligibility: { decision: 'MIEN_PHI', ruleCode: 'D1', reason: 'Còn hạn.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(148) },
+    qc: [{ round: 1, pass: true, items: [], by: 'u-qc', at: ago(20) }],
+    sla: { planConfirmedAt: ago(148), pauses: [] },
+  }),
+  mk({ id: 'k14', code: 'CAS-20261028-0007', status: 'COMPLETED', customerId: 'c6', deviceId: 'd7', symptom: 'Không nhận wifi.', createdAt: ago(360), precheck: pre('CON_HAN', 350), readyAt: ago(300),
+    eligibility: { decision: 'MIEN_PHI', ruleCode: 'D9', reason: 'Lỗi driver.', policyCode: 'BH-TC-2026', by: 'u-cskh', at: ago(340) },
+    handover: { recipientName: 'Hồ Quang Vinh', recipientPhone: '0909555666', relation: 'CHINH_CHU', idNote: 'Đối chiếu biên nhận gốc', accessoriesOk: true, conditionOk: true, inspectionFee: 0, signed: true, rating: 5, withoutRepair: false, by: 'u-tn', at: ago(290) },
+    sla: { planConfirmedAt: ago(340), pauses: [] } }),
+]
+
+const wo = (id: string, code: string, caseId: string, tech: string | undefined, tasks: [string, number, boolean][], parts: WorkOrder['parts'], extra: Partial<WorkOrder> = {}): WorkOrder => ({
+  id, code, caseId, technicianId: tech,
+  tasks: tasks.map(([title, minutes, done], i) => ({ id: `${id}-t${i}`, title, minutes, done })),
+  parts, assignHistory: tech ? [{ to: tech, by: 'u-dp', at: ago(40) }] : [], logs: [], createdAt: ago(60), ...extra,
+})
+const pp = (partId: string, qty: number, reserved = 0, issued = 0, used = 0) => ({ partId, qty, reserved, issued, used, returnPending: 0, returned: 0 })
+
+export const workOrders: WorkOrder[] = [
+  wo('w1', 'WO-0031', 'k9', undefined, [['Thay bàn phím', 45, false]], [pp('p4', 1)]),
+  wo('w2', 'WO-0034', 'k10', undefined, [['Sao lưu dữ liệu', 60, false], ['Thay SSD', 30, false], ['Cài đặt hệ điều hành', 60, false]], [pp('p1', 1, 1, 0)]),
+  wo('w3', 'WO-0029', 'k11', 'u-ktv1', [['Vệ sinh quạt, tản nhiệt', 40, true], ['Thay keo tản nhiệt', 20, false], ['Chạy thử tải nặng', 30, false]], [pp('p10', 1, 0, 1)], { startedAt: ago(30), logs: [{ at: ago(28), by: 'u-ktv1', text: 'Đã vệ sinh quạt, bụi bám nhiều.' }] }),
+  wo('w4', 'WO-0027', 'k12', 'u-ktv2', [['Thay adapter, kiểm tra cổng sạc', 20, true], ['Hàn lại cổng sạc', 40, true]], [pp('p6', 1, 0, 1, 1)], { startedAt: ago(90), finishedAt: ago(10) }),
+  wo('w5', 'WO-0024', 'k13', 'u-ktv3', [['Thay quạt tản nhiệt', 40, true]], [pp('p7', 1, 0, 1, 1)], { startedAt: ago(60), finishedAt: ago(24) }),
+]
+
+export const approvals: Approval[] = [
+  { id: 'a1', type: 'BAO_GIA', caseId: 'k7', title: 'Báo giá 5.300.000 đ vượt ngưỡng 2.000.000 đ', detail: 'Thay mainboard Acer Aspire 7 cho khách Phan Thị Ngọc. Lỗi do va đập (D4).', requestedBy: 'u-cskh', requestedAt: ago(30), status: 'CHO_DUYET' },
+  { id: 'a2', type: 'MUA_LINH_KIEN', partId: 'p4', qty: 5, title: 'Đề nghị mua 5 bàn phím HP ProBook 450', detail: 'Hết hàng, WO-0031 đang chờ.', requestedBy: 'u-kho', requestedAt: ago(48), status: 'CHO_DUYET' },
+]
+
+export const complaints: Complaint[] = [
+  { id: 'q1', code: 'KN-0003', caseId: 'k14', content: 'Khách phản ánh wifi chập chờn trở lại sau 1 tuần.', status: 'DANG_XU_LY', createdBy: 'u-cskh', createdAt: ago(30), updatedAt: ago(20) },
+]
+
+export const stockMoves: StockMove[] = [
+  { id: 's1', at: ago(200), by: 'u-kho', type: 'NHAP', partId: 'p1', qty: 10, note: 'Nhập theo đơn mua 10/2026' },
+  { id: 's2', at: ago(55), by: 'u-kho', type: 'GIU', partId: 'p1', qty: 1, woCode: 'WO-0034' },
+  { id: 's3', at: ago(31), by: 'u-kho', type: 'XUAT', partId: 'p10', qty: 1, woCode: 'WO-0029' },
+]
+
+export const audit: AuditEntry[] = []

@@ -1,39 +1,55 @@
-import { StrictMode, useState } from 'react'
-import { createRoot } from 'react-dom/client'
 import '@fontsource/be-vietnam-pro/400.css'
 import '@fontsource/be-vietnam-pro/500.css'
 import '@fontsource/be-vietnam-pro/600.css'
 import '@fontsource/be-vietnam-pro/700.css'
-import './styles.css'
-import { Layout } from './components/Layout'
-import type { Role } from './config/roles'
-import { useHashPath } from './lib/router'
-import { CaseDetail } from './screens/CaseDetail'
-import { CaseList } from './screens/CaseList'
-import { Inbox } from './screens/Inbox'
-import { Login } from './screens/Login'
+import { StrictMode } from 'react'
+import ReactDOM from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { RouterProvider, createRouter } from '@tanstack/react-router'
+import { DirectionProvider } from './context/direction-provider'
+import { FontProvider } from './context/font-provider'
+import { ThemeProvider } from './context/theme-provider'
+// Generated Routes
+import { routeTree } from './routeTree.gen'
+// Styles
+import './styles/index.css'
 
-function App() {
-  const path = useHashPath()
-  const [role, setRole] = useState<Role>('TN')
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: false, refetchOnWindowFocus: false },
+  },
+})
 
-  if (path === '/' || path === '/dang-nhap') return <Login />
+// Create a new router instance
+const router = createRouter({
+  routeTree,
+  context: { queryClient },
+  defaultPreload: 'intent',
+  defaultPreloadStaleTime: 0,
+})
 
-  let screen
-  if (path === '/hop-viec') screen = <Inbox role={role} />
-  else if (path === '/case') screen = <CaseList />
-  else if (path.startsWith('/case/')) screen = <CaseDetail id={decodeURIComponent(path.slice(6))} role={role} />
-  else screen = <div className="panel empty">Màn hình này chưa có wireframe.</div>
-
-  return (
-    <Layout role={role} onRoleChange={setRole} path={path}>
-      {screen}
-    </Layout>
-  )
+// Register the router instance for type safety
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router
+  }
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// Render the app
+const rootElement = document.getElementById('root')!
+if (!rootElement.innerHTML) {
+  const root = ReactDOM.createRoot(rootElement)
+  root.render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <FontProvider>
+            <DirectionProvider>
+              <RouterProvider router={router} />
+            </DirectionProvider>
+          </FontProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </StrictMode>
+  )
+}

@@ -3,10 +3,11 @@ import { useDb, useMe } from '@/api/hooks'
 import { fmtDateTime } from '@/domain/format'
 import { PARAMS } from '@/domain/params'
 import { ROLE_LABEL } from '@/domain/roles'
-import { SLA_RANK, slaInfo } from '@/domain/sla'
+import { shortageNeedsAction } from '@/domain/parts'
+import { openPause, SLA_RANK, slaInfo, waitingForParts } from '@/domain/sla'
 import type { WarrantyCase } from '@/domain/types'
 import { canSeeCustomer } from '@/features/cases/logic'
-import { openChange } from '@/api/service'
+import { openChange } from '@/domain/plan-change'
 import { Button } from '@/components/ui/button'
 import { CaseLink, Empty, PageShell, Pill, SlaBadge, StatusBadge } from '@/components/woms'
 
@@ -49,7 +50,7 @@ export function Inbox() {
         { title: 'Sẵn sàng sửa, chờ phân công', rows: by('READY_TO_REPAIR'), empty: 'Không có lệnh sửa chữa chờ phân công.', link: { to: '/dieu-phoi', label: 'Bảng điều phối' } },
         { title: 'Đang chờ xác nhận đổi phương án', hint: 'Kỹ thuật viên tạm ngừng cho tới khi CSKH và khách xác nhận (BR-12).', rows: db.cases.filter((c) => !!openChange(c)), empty: 'Không có lệnh đang chờ đổi phương án.' },
         { title: 'Sắp quá hạn và quá hạn', hint: 'Cảnh báo khi còn 4 giờ làm việc (PARAM-09).', rows: urgent, empty: 'Không có phiếu nào sắp quá hạn.' },
-        { title: `Chờ linh kiện quá ${PARAMS.partWaitWarnDays} ngày`, rows: by('WAITING_PARTS').filter((c) => since(c.sla.pauses.at(-1)?.start) >= PARAMS.partWaitWarnDays), empty: 'Không có lệnh chờ linh kiện quá lâu.' }
+        { title: `Chờ linh kiện quá ${PARAMS.partWaitWarnDays} ngày`, rows: db.cases.filter((c) => waitingForParts(c) && since(openPause(c, 'CHO_LINH_KIEN')?.start) >= PARAMS.partWaitWarnDays), empty: 'Không có lệnh chờ linh kiện quá lâu.' }
       )
       break
     case 'KTV':
@@ -62,8 +63,19 @@ export function Inbox() {
       break
     case 'KHO':
       q.push(
-        { title: 'Lệnh sửa chữa cần giữ linh kiện', rows: by('WO_CREATED'), empty: 'Không có lệnh mới cần chuẩn bị linh kiện.', link: { to: '/kho/yeu-cau', label: 'Yêu cầu linh kiện' } },
-        { title: 'Đang chờ linh kiện về', rows: by('WAITING_PARTS'), empty: 'Không có lệnh chờ linh kiện.', link: { to: '/kho/nhap', label: 'Nhập kho' } },
+        {
+          title: 'Lệnh sửa chữa cần chuẩn bị linh kiện',
+          hint: 'Giữ hàng có sẵn, hoặc báo thiếu phần chưa có đề nghị mua. Gồm cả linh kiện bổ sung khi đổi phương án (BR-12).',
+          rows: db.cases.filter((c) => c.status === 'WO_CREATED' || (['WAITING_PARTS', 'IN_REPAIR'].includes(c.status) && !!wo(c) && shortageNeedsAction(db, wo(c)!))),
+          empty: 'Không có lệnh cần chuẩn bị linh kiện.',
+          link: { to: '/kho/yeu-cau', label: 'Yêu cầu linh kiện' },
+        },
+        {
+          title: 'Đang chờ linh kiện về',
+          rows: db.cases.filter((c) => waitingForParts(c) && !(wo(c) && shortageNeedsAction(db, wo(c)!))),
+          empty: 'Không có lệnh chờ linh kiện.',
+          link: { to: '/kho/nhap', label: 'Nhập kho' },
+        },
         { title: 'Cần cấp phát hoặc nhận lại', rows: db.cases.filter((c) => wo(c)?.parts.some((p) => p.reserved > 0 || p.returnPending > 0)), empty: 'Không có linh kiện chờ cấp phát hoặc trả.' }
       )
       break

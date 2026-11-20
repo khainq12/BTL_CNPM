@@ -1,5 +1,8 @@
 import { format } from 'date-fns'
 import { PARAMS } from '@/domain/params'
+import { availableQty, missingQty, purchaseOpenQty, toOrderQty } from '@/domain/parts'
+import { currentPlan, openChange } from '@/domain/plan-change'
+import { openPause } from '@/domain/sla'
 import { CASE_STATUS } from '@/domain/statuses'
 import type {
   Approval,
@@ -93,7 +96,7 @@ function newApproval(db: Db, user: User, type: ApprovalType, a: Partial<Approval
 }
 
 function endPause(c: WarrantyCase, reason: 'CHO_LINH_KIEN' | 'CHO_XAC_NHAN_GIA') {
-  const p = c.sla.pauses.find((x) => x.reason === reason && !x.end)
+  const p = openPause(c, reason)
   if (p) p.end = now()
 }
 
@@ -417,13 +420,8 @@ async function onWo(user: User, woId: string, action: string, fn: (w: WorkOrder,
   saveDb(db)
 }
 
-const available = (db: Db, partId: string) => {
-  const p = db.parts.find((x) => x.id === partId)!
-  return p.onHand - p.reserved
-}
-
 function allReserved(w: WorkOrder) {
-  return w.parts.every((p) => p.reserved + p.issued >= p.qty)
+  return w.parts.every((p) => missingQty(p) === 0)
 }
 
 export function reserveParts(user: User, woId: string) {
@@ -432,9 +430,9 @@ export function reserveParts(user: User, woId: string) {
     if (!['WO_CREATED', 'WAITING_PARTS', 'READY_TO_REPAIR', 'ASSIGNED', 'IN_REPAIR', 'REWORK'].includes(c.status)) throw new ApiError(422, 'Phiếu không ở bước chuẩn bị linh kiện.')
     const notes: string[] = []
     for (const line of w.parts) {
-      const missing = line.qty - line.reserved - line.issued
+      const missing = missingQty(line)
       if (missing <= 0) continue
-      const take = Math.min(missing, available(db, line.partId)) // BR-14: không giữ vượt số lượng khả dụng
+      const take = Math.min(missing, availableQty(db, line.partId)) // BR-14: không giữ vượt số lượng khả dụng
       if (take <= 0) continue
       const part = db.parts.find((x) => x.id === line.partId)!
       part.reserved += take
@@ -442,11 +440,23 @@ export function reserveParts(user: User, woId: string) {
       db.stockMoves.unshift({ id: uid('s'), at: now(), by: user.id, type: 'GIU', partId: line.partId, qty: take, woCode: w.code })
       notes.push(`${part.name} × ${take}`)
     }
-    if (!notes.length) throw new ApiError(422, 'Không còn linh kiện khả dụng để giữ. Dùng "Báo thiếu linh kiện".')
+    if (!notes.length) {
+      const missing = w.parts.filter((l) => missingQty(l) > 0)
+      throw new ApiError(
+        422,
+        !missing.length
+          ? 'Lệnh sửa chữa đã giữ đủ linh kiện.'
+          : missing.every((l) => toOrderQty(db, w, l) === 0)
+            ? 'Chưa có hàng để giữ. Phần thiếu đã có đề nghị mua, chờ hàng về rồi giữ.'
+            : 'Không còn linh kiện khả dụng để giữ. Dùng "Báo thiếu linh kiện".'
+      )
+    }
     if (allReserved(w) && (c.status === 'WO_CREATED' || c.status === 'WAITING_PARTS')) {
       endPause(c, 'CHO_LINH_KIEN')
       return { to: 'READY_TO_REPAIR', note: `Đã giữ: ${notes.join(', ')}` }
     }
+    // Linh kiện bổ sung khi đổi phương án đã về đủ: thôi tạm dừng, phiếu vẫn đang sửa.
+    if (allReserved(w) && c.status === 'IN_REPAIR') endPause(c, 'CHO_LINH_KIEN')
     return { note: `Đã giữ: ${notes.join(', ')}` }
   })
 }
@@ -454,15 +464,30 @@ export function reserveParts(user: User, woId: string) {
 export function markShortage(user: User, woId: string, note: string) {
   need(user, ['KHO'])
   return onWo(user, woId, 'Báo thiếu linh kiện', (w, c, db) => {
-    if (c.status !== 'WO_CREATED') throw new ApiError(422, 'Chỉ báo thiếu khi lệnh sửa chữa đang chuẩn bị linh kiện.')
-    const short = w.parts.filter((p) => p.reserved + p.issued < p.qty)
-    if (!short.length) throw new ApiError(422, 'Lệnh sửa chữa đã đủ linh kiện.')
-    for (const s of short) {
-      const part = db.parts.find((x) => x.id === s.partId)!
-      newApproval(db, user, 'MUA_LINH_KIEN', { partId: s.partId, qty: s.qty - s.reserved - s.issued, title: `Đề nghị mua ${part.name}`, detail: `${w.code} thiếu ${s.qty - s.reserved - s.issued} ${part.unit}. ${note}` })
+    // Báo thiếu được khi: chuẩn bị linh kiện; đang chờ linh kiện mà cần mua thêm (đề nghị cũ bị từ chối, hoặc hàng về
+    // đã giữ cho lệnh khác); đang sửa mà đổi phương án thêm linh kiện (BR-12, phiếu giữ nguyên "Đang sửa").
+    if (!['WO_CREATED', 'WAITING_PARTS', 'IN_REPAIR'].includes(c.status))
+      throw new ApiError(422, 'Chỉ báo thiếu khi lệnh sửa chữa đang chuẩn bị linh kiện, đang chờ linh kiện hoặc đang sửa.')
+    // Chỉ đề nghị mua phần không có sẵn trong kho và chưa có đề nghị mua đang chờ. Tính hết trước khi tạo đề nghị.
+    const short = w.parts.map((l) => ({ l, qty: toOrderQty(db, w, l) })).filter((x) => x.qty > 0)
+    if (!short.length) {
+      const missing = w.parts.filter((l) => missingQty(l) > 0)
+      throw new ApiError(
+        422,
+        !missing.length
+          ? 'Lệnh sửa chữa đã đủ linh kiện.'
+          : missing.some((l) => availableQty(db, l.partId) > 0)
+            ? 'Kho còn hàng cho phần thiếu. Dùng "Giữ linh kiện khả dụng".'
+            : 'Đã gửi đề nghị mua đủ phần thiếu, đang chờ linh kiện về.'
+      )
     }
-    c.sla.pauses.push({ reason: 'CHO_LINH_KIEN', start: now() })
-    return { to: 'WAITING_PARTS', note: note || 'Thiếu linh kiện bắt buộc, đã gửi đề nghị mua.' }
+    for (const { l, qty } of short) {
+      const part = db.parts.find((x) => x.id === l.partId)!
+      newApproval(db, user, 'MUA_LINH_KIEN', { partId: l.partId, qty, woId: w.id, title: `Đề nghị mua ${part.name}`, detail: `${w.code} thiếu ${qty} ${part.unit}. ${note}` })
+    }
+    // Đang chờ sẵn thì không mở thêm khoảng tạm dừng: báo thiếu lại không kéo dài giới hạn 3 ngày (PARAM-17).
+    if (!openPause(c, 'CHO_LINH_KIEN')) c.sla.pauses.push({ reason: 'CHO_LINH_KIEN', start: now() })
+    return { to: c.status === 'WO_CREATED' ? 'WAITING_PARTS' : undefined, note: note || 'Thiếu linh kiện bắt buộc, đã gửi đề nghị mua.' }
   })
 }
 
@@ -501,7 +526,7 @@ export function confirmPartReturn(user: User, woId: string, partId: string) {
   })
 }
 
-export async function stockIn(user: User, partId: string, qty: number, note: string) {
+export async function stockIn(user: User, partId: string, qty: number, note: string, forPurchase = true) {
   need(user, ['KHO'])
   await wait()
   if (!(qty > 0)) throw new ApiError(422, 'Số lượng nhập phải lớn hơn 0.')
@@ -509,8 +534,24 @@ export async function stockIn(user: User, partId: string, qty: number, note: str
   const part = db.parts.find((x) => x.id === partId)
   if (!part) throw new ApiError(404, 'Không tìm thấy linh kiện.')
   part.onHand += qty
+  // Hàng về theo đề nghị mua đã duyệt: ghi nhận cho đề nghị cũ trước (BR-17), để biết lệnh nào còn chờ hàng.
+  // Kho bỏ chọn khi hàng nhập không phải từ đề nghị mua (ví dụ nhà cung cấp đổi bảo hành).
+  const credited: string[] = []
+  if (forPurchase) {
+    let left = qty
+    const open = db.approvals
+      .filter((a) => a.type === 'MUA_LINH_KIEN' && a.partId === partId && a.status === 'DA_DUYET' && purchaseOpenQty(a) > 0)
+      .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
+    for (const a of open) {
+      if (left <= 0) break
+      const take = Math.min(left, purchaseOpenQty(a))
+      a.received = (a.received ?? 0) + take
+      left -= take
+      credited.push(`${a.title} × ${take}`)
+    }
+  }
   db.stockMoves.unshift({ id: uid('s'), at: now(), by: user.id, type: 'NHAP', partId, qty, note })
-  audit(db, user.id, 'KHO', part.sku, `Nhập kho ${qty} ${part.unit}`, note)
+  audit(db, user.id, 'KHO', part.sku, `Nhập kho ${qty} ${part.unit}`, [note, credited.length ? `Theo đề nghị: ${credited.join('; ')}` : ''].filter(Boolean).join(' · '))
   saveDb(db)
 }
 
@@ -605,23 +646,13 @@ export function finishRepair(user: User, id: string, v: number, used: Record<str
 // Bảng 6.2 không có bước chuyển riêng cho việc này. Theo RACI: KTV đề xuất, CSKH xét lại điều kiện bảo hành
 // và báo giá, quản lý duyệt nếu báo giá bổ sung vượt ngưỡng, khách xác nhận lại (tạm dừng hạn tối đa 5 ngày, PARAM-16).
 
-const OPEN_CHANGE: PlanChange['status'][] = ['CHO_CSKH', 'CHO_DUYET', 'CHO_GUI', 'CHO_KHACH']
-
-export function openChange(c: WarrantyCase) {
-  return c.planChanges?.find((x) => OPEN_CHANGE.includes(x.status))
-}
-
-export function currentPlan(c: WarrantyCase) {
-  return c.planChanges?.filter((x) => x.status === 'DA_AP_DUNG').at(-1)?.newPlan ?? c.diagnosis?.plan ?? ''
-}
-
 function needOpenChange(c: WarrantyCase, ...s: PlanChange['status'][]) {
   const ch = openChange(c)
   if (!ch || !s.includes(ch.status)) throw new ApiError(422, 'Không có đề xuất đổi phương án ở bước này. Tải lại để xem trạng thái mới nhất.')
   return ch
 }
 
-function applyChange(db: Db, c: WarrantyCase, ch: PlanChange) {
+function applyChange(db: Db, user: User, c: WarrantyCase, ch: PlanChange) {
   const w = findWo(db, c.workOrderId)
   ch.addTasks.forEach((t, i) => w.tasks.push({ id: `${w.id}-pc${ch.no}-${i}`, title: t.title, minutes: t.minutes, done: false }))
   for (const p of ch.addParts) {
@@ -631,7 +662,7 @@ function applyChange(db: Db, c: WarrantyCase, ch: PlanChange) {
   }
   ch.status = 'DA_AP_DUNG'
   ch.closedAt = now()
-  audit(db, ch.reviewedBy ?? ch.proposedBy, 'WO', w.code, `Áp dụng phương án mới (đề xuất #${ch.no})`, ch.newPlan)
+  audit(db, user.id, 'WO', w.code, `Áp dụng phương án mới (đề xuất #${ch.no})`, ch.newPlan)
 }
 
 // Dừng sửa giữa chừng: bỏ giữ linh kiện chưa cấp; linh kiện đã cấp mà chưa dùng chờ kho nhận lại (BR-16).
@@ -644,6 +675,17 @@ function releaseWoParts(db: Db, user: User, w: WorkOrder) {
       line.reserved = 0
     }
     line.returnPending = line.issued - line.used - line.returned
+    line.qty = line.issued // phần chưa cấp không còn cần nữa
+  }
+  w.parts = w.parts.filter((l) => l.qty > 0)
+  // Đề nghị mua do báo thiếu cho lệnh này mà quản lý chưa duyệt thì không còn cần: hệ thống tự hủy.
+  // Không ghi người dừng sửa là người hủy (họ không có quyền phê duyệt); nhật ký ghi vào lệnh sửa chữa.
+  for (const ap of db.approvals) {
+    if (ap.type !== 'MUA_LINH_KIEN' || ap.woId !== w.id || ap.status !== 'CHO_DUYET') continue
+    ap.status = 'DA_HUY'
+    ap.decidedAt = now()
+    ap.decisionNote = `${w.code} dừng sửa (${nameOf(db, user.id)} ghi nhận), không còn cần mua.`
+    audit(db, user.id, 'WO', w.code, 'Tự hủy đề nghị mua chưa duyệt vì dừng sửa', ap.title)
   }
 }
 
@@ -688,7 +730,7 @@ export function reviewPlanChange(
     }
     if (d.result === 'MIEN_PHI') {
       ch.charge = 'MIEN_PHI'
-      applyChange(db, c, ch)
+      applyChange(db, user, c, ch)
       ch.outcome = 'Áp dụng, trong phạm vi bảo hành'
       return { note: `#${ch.no}: ${d.note}` }
     }
@@ -753,7 +795,7 @@ export function respondPlanChange(
     Object.assign(q, { status: d.accepted ? 'KHACH_DONG_Y' : 'KHACH_TU_CHOI', confirmMethod: d.method, confirmNote: d.note, respondedAt: now() })
     endPause(c, 'CHO_XAC_NHAN_GIA')
     if (d.accepted) {
-      applyChange(db, c, ch)
+      applyChange(db, user, c, ch)
       ch.outcome = `Khách đồng ý báo giá v${q.version}`
       return { note: `${d.method}${d.note ? `. ${d.note}` : ''}` }
     }
@@ -761,6 +803,7 @@ export function respondPlanChange(
     if (d.next === 'TRA_MAY') {
       ch.outcome = 'Khách từ chối, dừng sửa và trả thiết bị'
       releaseWoParts(db, user, findWo(db, c.workOrderId))
+      endPause(c, 'CHO_LINH_KIEN')
       return { to: 'RETURN_PENDING', note: `${d.method}. Khách không đồng ý chi phí phát sinh, dừng sửa.` }
     }
     ch.outcome = 'Khách từ chối, tiếp tục phương án cũ'
@@ -870,6 +913,8 @@ export async function decideApproval(user: User, approvalId: string, d: { approv
       }
       break
     case 'MUA_LINH_KIEN':
+      // Không cần sửa lệnh: số đang chờ mua tính từ chính các đề nghị (domain/parts.ts). Bị từ chối thì phần đó
+      // thành "chưa đề nghị" và kho báo thiếu lại được.
       break
   }
   audit(db, user.id, 'PHE_DUYET', ap.title, d.approve ? 'Duyệt' : 'Từ chối', d.note)

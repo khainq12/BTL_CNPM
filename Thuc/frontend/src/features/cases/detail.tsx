@@ -4,6 +4,7 @@ import { Check, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
+import { currentPlan, openChange } from '@/domain/plan-change'
 import { fmtDateTime, fmtMinutes, fmtMoney } from '@/domain/format'
 import { CAUSE_LABEL, DECISION_LABEL, DEVICE_KIND_LABEL, WARRANTY_CHECK_LABEL } from '@/domain/rules'
 import { slaInfo } from '@/domain/sla'
@@ -47,7 +48,7 @@ function Detail({ id }: { id: string }) {
   const dev = db.devices.find((x) => x.id === c.deviceId)!
   const actions = nextActions(me, c, wo)
   const sla = slaInfo(c)
-  const change = api.openChange(c)
+  const change = openChange(c)
 
   return (
     <PageShell
@@ -332,13 +333,13 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
       <Section title={`${wo.code}`} description={`Kỹ thuật viên: ${name(wo.technicianId)} · Lập ${fmtDateTime(wo.createdAt)}${wo.startedAt ? ` · Bắt đầu ${fmtDateTime(wo.startedAt)}` : ''}`}>
         <p className='mb-3 text-sm'>
           <span className='text-muted-foreground'>Phương án hiện hành: </span>
-          {api.currentPlan(c) || '—'}
+          {currentPlan(c) || '—'}
         </p>
-        {mine && api.openChange(c) && <p className='mb-3 text-sm font-medium'>Đang chờ xác nhận đổi phương án, tạm ngừng đánh dấu công việc (BR-12).</p>}
+        {mine && openChange(c) && <p className='mb-3 text-sm font-medium'>Đang chờ xác nhận đổi phương án, tạm ngừng đánh dấu công việc (BR-12).</p>}
         <ul className='grid gap-2'>
           {wo.tasks.map((t) => (
             <li key={t.id} className='flex items-center gap-3 text-sm'>
-              <Checkbox checked={t.done} disabled={!mine || !!api.openChange(c) || toggle.isPending} onCheckedChange={() => toggle.mutate([me, wo.id, t.id])} aria-label={t.title} />
+              <Checkbox checked={t.done} disabled={!mine || !!openChange(c) || toggle.isPending} onCheckedChange={() => toggle.mutate([me, wo.id, t.id])} aria-label={t.title} />
               <span className={cn('flex-1', t.done && 'text-muted-foreground line-through')}>{t.title}</span>
               <span className='text-muted-foreground text-xs'>{fmtMinutes(t.minutes)}</span>
             </li>

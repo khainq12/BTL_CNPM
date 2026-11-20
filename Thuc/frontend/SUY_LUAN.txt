@@ -124,9 +124,20 @@ Khi nhóm chốt khác đi, sửa ở file cấu hình tương ứng (ghi trong 
         - Trong lúc chờ, kỹ thuật viên không đánh dấu công việc, không hoàn tất được; vẫn ghi nhật ký được.
         - Dừng sửa giữa chừng: linh kiện đang giữ được trả về khả dụng; linh kiện đã cấp mà chưa dùng
           chuyển "chờ trả kho" (coi như chưa dùng cái nào). Áp dụng cả khi quản lý chọn "Dừng sửa"
-          sau MANAGER_REVIEW.
+          sau MANAGER_REVIEW. Phần linh kiện chưa cấp thì bỏ khỏi lệnh sửa chữa (không còn cần).
+          Đề nghị mua do báo thiếu cho lệnh đó mà quản lý chưa duyệt thì hệ thống tự chuyển "Đã hủy"
+          (trạng thái mới của đề nghị), ghi "Tự hủy" chứ không ghi người dừng sửa là người hủy (họ không
+          có quyền phê duyệt); nhật ký ghi vào lệnh sửa chữa. Đề nghị đã duyệt thì giữ nguyên vì có thể
+          đã đặt hàng.
+        - Linh kiện bổ sung hết hàng: kho được "Báo thiếu linh kiện" cả khi phiếu đang sửa. Hệ thống tạo
+          đề nghị mua (BR-17) và tạm dừng hạn "chờ linh kiện" (PARAM-17), nhưng phiếu vẫn ở IN_REPAIR
+          (bảng 6.2 không có IN_REPAIR -> WAITING_PARTS) để kỹ thuật viên làm tiếp các việc không cần
+          linh kiện đó. Kho giữ đủ phần thiếu thì hết tạm dừng. Cách đặt mua xem 2.16.
+        - Phiếu đang sửa mà chờ linh kiện được tính là "đang chờ linh kiện" ở mọi hàng đợi (kho, điều phối,
+          quản lý, trang Nhập kho), như phiếu ở bước WAITING_PARTS.
         - Mỗi lần chỉ có một đề xuất đang mở. Lưu cả phương án cũ và mới.
-      Cần xác nhận: TV2, TV5. (src/api/service.ts, mục "Đổi phương án"; src/features/cases/plan-change.tsx)
+      Cần xác nhận: TV2, TV5. (src/api/service.ts, mục "Đổi phương án"; src/features/cases/plan-change.tsx;
+      src/domain/plan-change.ts)
 
 2.14. Kho chỉ cấp phát linh kiện khi lệnh sửa chữa đã có kỹ thuật viên được phân công,
       vì cấp phát là giao cho người cụ thể (BR-15). Giữ linh kiện thì làm được trước khi phân công.
@@ -134,6 +145,21 @@ Khi nhóm chốt khác đi, sửa ở file cấu hình tương ứng (ghi trong 
 
 2.15. Khiếu nại lưu lịch sử từng lần cập nhật (tình trạng, ghi chú, người, giờ). Khi đóng khiếu nại
       phải ghi kết quả mới, không dùng lại ghi chú của lần chuyển quản lý.
+
+2.16. Báo thiếu, đề nghị mua và hàng về (BR-14..17). Tài liệu chỉ nói "thiếu thì đề nghị mua, quản lý
+      duyệt", nên các điểm sau là suy luận:
+        - Đề nghị mua do báo thiếu gắn với lệnh sửa chữa. Số "đang chờ mua" của một dòng không lưu riêng
+          mà tính từ các đề nghị đó: đề nghị chờ duyệt cộng phần đã duyệt mà chưa nhận hàng.
+        - Báo thiếu chỉ đề nghị mua phần không có sẵn trong kho và chưa có đề nghị đang chờ. Kho còn hàng
+          thì phải "Giữ" chứ không báo thiếu (tránh dừng thời hạn và mua thừa).
+        - Báo thiếu được ở 3 bước: chuẩn bị linh kiện, đang chờ linh kiện (đề nghị cũ bị từ chối, hoặc hàng
+          về đã giữ cho lệnh khác), đang sửa (đổi phương án). Báo lại không mở thêm khoảng tạm dừng.
+        - Nhập kho ghi nhận hàng về cho các đề nghị mua đã duyệt của linh kiện đó, đề nghị cũ trước. Kho bỏ
+          chọn ô "theo đề nghị mua" nếu hàng nhập không phải từ đề nghị (ví dụ nhà cung cấp đổi bảo hành).
+          Đề nghị hiện "Đã duyệt, chờ hàng về", "đã nhận x/y" hoặc "đã nhận hàng".
+        - Hàng về là của kho, chưa gắn với lệnh nào; kho chọn giữ cho lệnh nào. Nếu giữ cho lệnh khác thì
+          lệnh đặt mua ban đầu lại cần đặt mua và kho báo thiếu lại được.
+      Cần xác nhận: TV2 (quy trình kho), TV4 (API nhập kho có gắn đề nghị mua). (src/domain/parts.ts)
 
 
 3. THỜI HẠN XỬ LÝ (SLA)
@@ -156,6 +182,9 @@ Khi nhóm chốt khác đi, sửa ở file cấu hình tương ứng (ghi trong 
      nếu bắt đầu trước hạn. Phiếu vẫn hiện "Quá hạn" trong lúc tạm dừng đó.
      Căn cứ: mục 6.3 yêu cầu lưu "thời gian vượt giới hạn"; tạm dừng không xóa vi phạm đã xảy ra.
      Cần xác nhận: TV2.
+3.6. Hai khoảng tạm dừng có thể chồng nhau (đang chờ linh kiện bổ sung thì lại chờ khách xác nhận
+     báo giá bổ sung). Phần thời gian chồng nhau chỉ được trừ một lần; mỗi khoảng vẫn bị giới hạn
+     riêng (5 ngày chờ giá, 3 ngày chờ linh kiện). Cần xác nhận: TV2. (src/domain/sla.ts)
 
 
 4. DỮ LIỆU, GIAO DIỆN, KỸ THUẬT

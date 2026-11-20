@@ -259,13 +259,15 @@ export type Approval = {
   type: ApprovalType
   caseId?: string
   planChangeId?: string
+  woId?: string // đề nghị mua do báo thiếu cho một lệnh sửa chữa
   partId?: string
   qty?: number
+  received?: number // đề nghị mua: số đã nhập kho theo đề nghị này
   title: string
   detail: string
   requestedBy: string
   requestedAt: string
-  status: 'CHO_DUYET' | 'DA_DUYET' | 'TU_CHOI'
+  status: 'CHO_DUYET' | 'DA_DUYET' | 'TU_CHOI' | 'DA_HUY'
   decidedBy?: string
   decidedAt?: string
   decisionNote?: string

@@ -33,7 +33,7 @@ export type Db = {
   counters: { case: number; wo: number; complaint: number }
 }
 
-const KEY = 'woms-db-v2' // đổi khi cấu trúc dữ liệu giả thay đổi, để trình duyệt nạp lại dữ liệu mẫu
+const KEY = 'woms-db-v3' // đổi khi cấu trúc dữ liệu giả thay đổi, để trình duyệt nạp lại dữ liệu mẫu
 
 function fresh(): Db {
   const db: Db = structuredClone({
@@ -64,8 +64,18 @@ function fresh(): Db {
 
 let cache: Db | null = null
 
+// Xóa dữ liệu của các phiên bản cũ (có thể chứa ảnh) để không chiếm dung lượng trình duyệt.
+function dropOldVersions() {
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('woms-db-') && k !== KEY) localStorage.removeItem(k)
+  } catch {
+    // bộ nhớ trình duyệt bị chặn: bỏ qua
+  }
+}
+
 export function loadDb(): Db {
   if (cache) return cache
+  dropOldVersions()
   try {
     const raw = localStorage.getItem(KEY)
     cache = raw ? (JSON.parse(raw) as Db) : fresh()

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
+import { approvalStatus } from '@/domain/approvals'
 import { fmtDateTime, fmtMoney } from '@/domain/format'
 import type { Approval, ApprovalType } from '@/domain/types'
 import { Button } from '@/components/ui/button'
@@ -76,7 +77,7 @@ function ApprovalList({ rows, onOpen }: { rows: Approval[]; onOpen?: (a: Approva
               <p className='text-muted-foreground'>{a.detail}</p>
               <p className='text-muted-foreground mt-1 text-xs'>
                 {name(a.requestedBy)} đề nghị lúc {fmtDateTime(a.requestedAt)}
-                {a.decidedAt && ` · ${a.status === 'DA_DUYET' ? 'Duyệt' : 'Từ chối'} bởi ${name(a.decidedBy)} lúc ${fmtDateTime(a.decidedAt)}${a.decisionNote ? `: ${a.decisionNote}` : ''}`}
+                {a.decidedAt && a.status !== 'CHO_DUYET' && ` · ${a.status === 'DA_HUY' ? 'Tự hủy' : `${a.status === 'DA_DUYET' ? 'Duyệt' : 'Từ chối'} bởi ${name(a.decidedBy)}`} lúc ${fmtDateTime(a.decidedAt)}${a.decisionNote ? `: ${a.decisionNote}` : ''}`}
               </p>
             </div>
             {onOpen ? (
@@ -84,7 +85,7 @@ function ApprovalList({ rows, onOpen }: { rows: Approval[]; onOpen?: (a: Approva
                 Xem xét
               </Button>
             ) : (
-              <Pill tone={a.status === 'DA_DUYET' ? 'done' : 'bad'}>{a.status === 'DA_DUYET' ? 'Đã duyệt' : 'Từ chối'}</Pill>
+              <Pill tone={approvalStatus(a).tone}>{approvalStatus(a).label}</Pill>
             )}
           </li>
         )

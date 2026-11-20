@@ -186,7 +186,7 @@ export const workOrders: WorkOrder[] = [
 
 export const approvals: Approval[] = [
   { id: 'a1', type: 'BAO_GIA', caseId: 'k7', title: 'Báo giá 5.300.000 đ vượt ngưỡng 2.000.000 đ', detail: 'Thay mainboard Acer Aspire 7 cho khách Phan Thị Ngọc. Lỗi do va đập (D4).', requestedBy: 'u-cskh', requestedAt: ago(30), status: 'CHO_DUYET' },
-  { id: 'a2', type: 'MUA_LINH_KIEN', partId: 'p4', qty: 5, title: 'Đề nghị mua 5 bàn phím HP ProBook 450', detail: 'Hết hàng, WO-0031 đang chờ.', requestedBy: 'u-kho', requestedAt: ago(48), status: 'CHO_DUYET' },
+  { id: 'a2', type: 'MUA_LINH_KIEN', woId: 'w1', partId: 'p4', qty: 5, title: 'Đề nghị mua 5 bàn phím HP ProBook 450', detail: 'Hết hàng, WO-0031 đang chờ.', requestedBy: 'u-kho', requestedAt: ago(48), status: 'CHO_DUYET' },
 ]
 
 export const complaints: Complaint[] = [

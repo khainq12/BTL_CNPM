@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ImageIcon, ImagePlus, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Photo } from '@/domain/types'
@@ -45,13 +45,22 @@ export function PhotoPicker({
 }) {
   const [busy, setBusy] = useState(0)
   const [view, setView] = useState<number | null>(null)
+  // Danh sách mới nhất: người dùng có thể xóa ảnh trong lúc ảnh khác đang nén.
+  const latest = useRef(value)
+  useEffect(() => {
+    latest.current = value
+  }, [value])
 
   async function pick(files: File[]) {
     const room = max - value.length
-    const tooBig = files.filter((f) => f.size > MAX_INPUT).length
-    const ok = files.filter((f) => f.size <= MAX_INPUT && f.type.startsWith('image/')).slice(0, Math.max(0, room))
+    const images = files.filter((f) => f.type.startsWith('image/'))
+    const notImage = files.length - images.length
+    const tooBig = images.filter((f) => f.size > MAX_INPUT).length
+    const usable = images.filter((f) => f.size <= MAX_INPUT)
+    const ok = usable.slice(0, Math.max(0, room))
+    if (notImage) toast.error(`${notImage} tệp không phải ảnh, đã bỏ qua.`)
     if (tooBig) toast.error(`${tooBig} ảnh lớn hơn 15 MB, đã bỏ qua.`)
-    if (files.length - tooBig > ok.length) toast.error(`Chỉ nhận tối đa ${max} ảnh.`)
+    if (usable.length > ok.length) toast.error(`Chỉ nhận tối đa ${max} ảnh.`)
     if (!ok.length) return
     setBusy(ok.length)
     const out: Photo[] = []
@@ -63,7 +72,7 @@ export function PhotoPicker({
       }
     }
     setBusy(0)
-    onChange([...value, ...out])
+    onChange([...latest.current, ...out])
   }
 
   return (

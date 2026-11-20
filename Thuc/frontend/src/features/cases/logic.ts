@@ -1,7 +1,8 @@
 import { PARAMS } from '@/domain/params'
 import type { User, WarrantyCase, WorkOrder } from '@/domain/types'
 import type { Db } from '@/mock/db'
-import { openChange } from '@/api/service'
+import { woNeedsWarehouse } from '@/domain/parts'
+import { openChange } from '@/domain/plan-change'
 
 // Ai được mở chi tiết phiếu (ma trận phân quyền 5.3; AT-14: từ chối kể cả khi biết mã phiếu).
 export function canViewCase(me: User, c: WarrantyCase, wo?: WorkOrder) {
@@ -117,7 +118,7 @@ export function nextActions(me: User, c: WarrantyCase, wo: WorkOrder | undefined
       }
       break
     case 'KHO':
-      if (wo && wo.parts.some((p) => p.reserved + p.issued < p.qty || p.reserved > 0 || p.returnPending > 0)) a.push({ key: 'warehouse', label: 'Xử lý linh kiện', primary: true })
+      if (wo && woNeedsWarehouse(wo)) a.push({ key: 'warehouse', label: 'Xử lý linh kiện', primary: true })
       break
     case 'QC':
       if (c.status === 'TESTING') a.push({ key: 'qc', label: 'Kiểm tra chất lượng', primary: true, disabled: wo?.technicianId === me.id ? 'Người kiểm tra phải khác người sửa.' : undefined })

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
+import { currentPlan } from '@/domain/plan-change'
 import { fmtMoney } from '@/domain/format'
 import { PARAMS } from '@/domain/params'
 import {
@@ -688,7 +689,7 @@ function Qc({ c, onClose }: P) {
       <p className='bg-muted rounded-md p-3 text-sm'>
         <span className='font-medium'>Lỗi ban đầu:</span> {c.symptom}
         <br />
-        <span className='font-medium'>Đã làm:</span> {api.currentPlan(c)}
+        <span className='font-medium'>Đã làm:</span> {currentPlan(c)}
         {c.reworkCount > 0 && (
           <>
             <br />

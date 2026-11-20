@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
 import { PARAMS } from '@/domain/params'
+import { vnToday } from '@/domain/sla'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -29,9 +30,9 @@ function Inner() {
   const [name, setName] = useState('')
   const add = useAction(api.addHoliday, { success: 'Đã thêm ngày nghỉ' })
   const remove = useAction(api.removeHoliday, { success: 'Đã xóa ngày nghỉ' })
-  const year = new Date().getFullYear()
   const [showPast, setShowPast] = useState(false)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = vnToday()
+  const year = Number(today.slice(0, 4))
   const rows = db.holidays.filter((h) => showPast || h.date >= today)
 
   return (

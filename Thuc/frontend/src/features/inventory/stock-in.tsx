@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
+import { approvalStatus } from '@/domain/approvals'
 import { fmtDateTime } from '@/domain/format'
+import { purchaseOpenQty } from '@/domain/parts'
+import { waitingForParts } from '@/domain/sla'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Field, NativeSelect, SubmitButton } from '@/components/form-kit'
@@ -24,14 +28,18 @@ function Inner() {
   const [partId, setPartId] = useState('')
   const [qty, setQty] = useState(1)
   const [note, setNote] = useState('')
+  const [forPurchase, setForPurchase] = useState(true)
   const [buyPart, setBuyPart] = useState('')
   const [buyQty, setBuyQty] = useState(1)
   const [buyReason, setBuyReason] = useState('')
   const [tried, setTried] = useState<'in' | 'buy' | null>(null)
-  const stockIn = useAction(api.stockIn, { success: 'Đã nhập kho', onDone: () => (setQty(1), setNote(''), setTried(null)) })
+  // Sau mỗi lần nhập, ô "theo đề nghị mua" trở về mặc định để lần sau không vô tình bỏ ghi nhận.
+  const stockIn = useAction(api.stockIn, { success: 'Đã nhập kho', onDone: () => (setQty(1), setNote(''), setTried(null), setForPurchase(true)) })
   const buy = useAction(api.requestPurchase, { success: 'Đã gửi đề nghị mua cho quản lý', onDone: () => (setBuyReason(''), setTried(null)) })
   const purchases = db.approvals.filter((a) => a.type === 'MUA_LINH_KIEN')
-  const waiting = db.cases.filter((c) => c.status === 'WAITING_PARTS')
+  const waiting = db.cases.filter(waitingForParts)
+  // Đề nghị mua đã duyệt của linh kiện đang chọn mà chưa nhận đủ hàng: nhập kho sẽ ghi nhận cho các đề nghị này.
+  const awaiting = purchases.filter((a) => a.partId === partId && a.status === 'DA_DUYET').reduce((s, a) => s + purchaseOpenQty(a), 0)
 
   return (
     <PageShell title='Nhập kho và mua thêm' description={waiting.length ? `${waiting.length} lệnh sửa chữa đang chờ linh kiện. Nhập kho xong, vào "Yêu cầu linh kiện" để giữ cho lệnh đó.` : undefined}>
@@ -44,14 +52,22 @@ function Inner() {
               onSubmit={(e) => {
                 e.preventDefault()
                 setTried('in')
-                if (partId && qty > 0) stockIn.mutate([me, partId, qty, note])
+                if (partId && qty > 0) stockIn.mutate([me, partId, qty, note, forPurchase && awaiting > 0])
               }}
             >
-              <PartSelect value={partId} onChange={setPartId} error={tried === 'in' && !partId && 'Chọn linh kiện.'} />
+              <PartSelect value={partId} onChange={(v) => (setPartId(v), setForPurchase(true))} error={tried === 'in' && !partId && 'Chọn linh kiện.'} />
               <Field label='Số lượng nhập' required>
                 {(id) => <Input id={id} type='number' min={1} className='w-32' value={qty} onChange={(e) => setQty(Number(e.target.value))} />}
               </Field>
               <Field label='Chứng từ, nhà cung cấp'>{(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} placeholder='Phiếu nhập PN-1125, NCC Phong Vũ' />}</Field>
+              {awaiting > 0 && (
+                <label className='flex items-start gap-2 text-sm'>
+                  <Checkbox checked={forPurchase} onCheckedChange={(v) => setForPurchase(v === true)} className='mt-0.5' />
+                  <span>
+                    Hàng về theo đề nghị mua đã duyệt (còn chờ {awaiting}). Bỏ chọn nếu hàng nhập không phải từ đề nghị mua.
+                  </span>
+                </label>
+              )}
               <SubmitButton type='submit' pending={stockIn.isPending} className='justify-self-start'>
                 Nhập kho
               </SubmitButton>
@@ -92,9 +108,10 @@ function Inner() {
                   <span className='font-medium'>{a.title}</span>
                   <span className='text-muted-foreground block text-xs'>
                     {a.detail} · {name(a.requestedBy)}, {fmtDateTime(a.requestedAt)}
+                    {(a.status === 'TU_CHOI' || a.status === 'DA_HUY') && a.decisionNote ? ` · ${a.decisionNote}` : ''}
                   </span>
                 </span>
-                <Pill tone={a.status === 'CHO_DUYET' ? 'wait' : a.status === 'DA_DUYET' ? 'done' : 'bad'}>{a.status === 'CHO_DUYET' ? 'Chờ duyệt' : a.status === 'DA_DUYET' ? 'Đã duyệt, chờ hàng về' : 'Từ chối'}</Pill>
+                <Pill tone={approvalStatus(a).tone}>{approvalStatus(a).label}</Pill>
               </li>
             ))}
           </ul>

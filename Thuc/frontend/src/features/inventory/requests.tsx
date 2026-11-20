@@ -1,4 +1,5 @@
 import { useDb } from '@/api/hooks'
+import { woNeedsWarehouse } from '@/domain/parts'
 import { CaseLink, Empty, Guard, PageShell, Section, SlaBadge, StatusBadge, useName } from '@/components/woms'
 import { WoParts } from './wo-parts'
 
@@ -16,7 +17,7 @@ function Inner() {
   const name = useName()
   const rows = db.workOrders
     .map((w) => ({ w, c: db.cases.find((c) => c.id === w.caseId)! }))
-    .filter(({ w, c }) => !['COMPLETED', 'CANCELLED'].includes(c.status) && w.parts.some((p) => p.reserved + p.issued < p.qty || p.reserved > 0 || p.returnPending > 0))
+    .filter(({ w, c }) => !['COMPLETED', 'CANCELLED'].includes(c.status) && woNeedsWarehouse(w))
     .sort((a, b) => a.w.createdAt.localeCompare(b.w.createdAt))
   return (
     <PageShell title='Yêu cầu linh kiện' description='Giữ linh kiện khả dụng cho lệnh mới, báo thiếu nếu hết hàng, cấp phát khi kỹ thuật viên nhận, xác nhận nhận lại phần chưa dùng.'>

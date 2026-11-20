@@ -22,6 +22,9 @@ export function setHolidays(dates: string[]) {
   holidays = new Set(dates)
 }
 
+// Ngày hôm nay theo giờ Việt Nam (YYYY-MM-DD), dùng chung với cách tính hạn.
+export const vnToday = (ms = Date.now()) => vn(ms).date
+
 const isWorkDay = (v: { dow: number; date: string }) => v.dow !== 0 && !holidays.has(v.date) // Thứ 2 – Thứ 7, trừ ngày lễ
 
 export function workingMinutesBetween(a: number, b: number): number {
@@ -59,6 +62,16 @@ export function addWorkingMinutes(start: number, minutes: number): number {
   return cursor
 }
 
+// Khoảng tạm dừng đang mở theo lý do (mỗi lý do có tối đa một khoảng mở).
+export function openPause(c: WarrantyCase, reason: Pause['reason']) {
+  return c.sla.pauses.find((p) => p.reason === reason && !p.end)
+}
+
+// Phiếu đang chờ linh kiện về: ở bước "Chờ linh kiện", hoặc đang sửa mà linh kiện bổ sung khi đổi phương án đã báo thiếu.
+export function waitingForParts(c: WarrantyCase) {
+  return c.status === 'WAITING_PARTS' || (c.status === 'IN_REPAIR' && !!openPause(c, 'CHO_LINH_KIEN'))
+}
+
 const PAUSE_CAP = {
   CHO_LINH_KIEN: PARAMS.pausePartsMaxDays * WORK_DAY_MINUTES,
   CHO_XAC_NHAN_GIA: PARAMS.pauseQuoteMaxDays * WORK_DAY_MINUTES,
@@ -89,15 +102,22 @@ export function slaInfo(c: WarrantyCase, now = Date.now()): SlaInfo {
   const start = Date.parse(c.sla.planConfirmedAt)
   const pauses = c.sla.pauses.map((p) => ({ p, ...pauseMinutes(p, now) })).sort((a, b) => a.p.start.localeCompare(b.p.start))
   // Cộng dần từng khoảng tạm dừng. Khoảng bắt đầu sau khi đã quá hạn thì không dời hạn: tạm dừng không xóa vi phạm đã xảy ra.
+  // Hai khoảng chồng nhau (vừa chờ linh kiện vừa chờ khách xác nhận giá) thì phần chồng chỉ tính một lần.
   let due = addWorkingMinutes(start, PARAMS.repairSlaDays * WORK_DAY_MINUTES)
+  let coveredUntil = 0
   const counted = new Set<Pause>()
   for (const x of pauses) {
-    if (Date.parse(x.p.start) >= due) continue
-    due = addWorkingMinutes(due, x.effective)
+    const s = Date.parse(x.p.start)
+    if (s >= due) continue
     counted.add(x.p)
+    const end = addWorkingMinutes(s, x.effective) // hết phần được tính (đã áp giới hạn tạm dừng)
+    const from = Math.max(s, coveredUntil)
+    if (end > from) due = addWorkingMinutes(due, workingMinutesBetween(from, end))
+    coveredUntil = Math.max(coveredUntil, end)
   }
   const dueAt = new Date(due).toISOString()
-  const active = pauses.find((x) => !x.p.end)
+  // Nhiều khoảng cùng mở: ưu tiên khoảng còn trong giới hạn và được tính vào hạn.
+  const active = pauses.find((x) => !x.p.end && counted.has(x.p) && !x.overCap) ?? pauses.find((x) => !x.p.end)
 
   if (STOP_STATUSES.includes(c.status)) return { kind: 'stopped', label: 'Đã dừng tính', detail: '', dueAt }
 

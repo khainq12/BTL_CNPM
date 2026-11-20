@@ -1,4 +1,5 @@
 import { useDb, useMe } from '@/api/hooks'
+import { woNeedsWarehouse } from '@/domain/parts'
 
 // Số đếm trên menu: việc đang chờ vai trò hiện tại.
 export function useNavCounts(): Record<string, number> {
@@ -19,11 +20,7 @@ export function useNavCounts(): Record<string, number> {
     complaints: db.complaints.filter((q) => q.status !== 'DA_GIAI_QUYET' && (me.role !== 'QL' || q.status === 'CHUYEN_QUAN_LY')).length,
     parts: db.workOrders.filter((w) => {
       const c = db.cases.find((x) => x.id === w.caseId)
-      return (
-        c &&
-        !['COMPLETED', 'CANCELLED'].includes(c.status) &&
-        w.parts.some((p) => p.reserved + p.issued < p.qty || p.reserved > 0 || p.returnPending > 0)
-      )
+      return c && !['COMPLETED', 'CANCELLED'].includes(c.status) && woNeedsWarehouse(w)
     }).length,
   }
 }

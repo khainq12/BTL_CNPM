@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
-import type { WorkOrder } from '@/domain/types'
+import { availableQty, missingQty, onOrderQty, toOrderQty } from '@/domain/parts'
+import { slaInfo, waitingForParts } from '@/domain/sla'
+import type { CaseStatus, WorkOrder } from '@/domain/types'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,9 +22,14 @@ export function WoParts({ wo, compact }: { wo: WorkOrder; compact?: boolean }) {
   const [shortOpen, setShortOpen] = useState(false)
 
   if (wo.parts.length === 0) return <p className='text-muted-foreground text-sm'>Lệnh sửa chữa không cần linh kiện.</p>
-  const needReserve = wo.parts.some((p) => p.reserved + p.issued < p.qty)
-  const canReserve = needReserve && wo.parts.some((p) => p.reserved + p.issued < p.qty && db.parts.find((x) => x.id === p.partId)!.onHand - db.parts.find((x) => x.id === p.partId)!.reserved > 0)
+  const needReserve = wo.parts.some((p) => missingQty(p) > 0)
+  const canReserve = wo.parts.some((p) => missingQty(p) > 0 && availableQty(db, p.partId) > 0)
   const canIssue = wo.parts.some((p) => p.reserved > 0)
+  // Báo thiếu phần không có sẵn trong kho và chưa có đề nghị mua đang chờ (cùng quy tắc với lớp API).
+  const canReportShort = ['WO_CREATED', 'WAITING_PARTS', 'IN_REPAIR'].includes(c.status) && wo.parts.some((p) => toOrderQty(db, wo, p) > 0)
+  const hasOnOrder = wo.parts.some((p) => missingQty(p) > 0 && onOrderQty(db, wo.id, p.partId) > 0)
+  const waitingNote =
+    waitingForParts(c) && hasOnOrder ? `Phần thiếu đã có đề nghị mua, đang chờ hàng về.${slaInfo(c).kind === 'paused' ? ' Thời hạn xử lý tạm dừng.' : ''}` : undefined
 
   return (
     <div className='grid gap-3'>
@@ -44,7 +51,7 @@ export function WoParts({ wo, compact }: { wo: WorkOrder; compact?: boolean }) {
             {wo.parts.map((p) => {
               const part = db.parts.find((x) => x.id === p.partId)!
               const avail = part.onHand - part.reserved
-              const ok = p.reserved + p.issued >= p.qty
+              const ok = missingQty(p) === 0
               return (
                 <TableRow key={p.partId}>
                   <TableCell>
@@ -59,7 +66,17 @@ export function WoParts({ wo, compact }: { wo: WorkOrder; compact?: boolean }) {
                   {!compact && <TableCell className='text-right tabular-nums'>{p.used}</TableCell>}
                   <TableCell className='text-right tabular-nums'>{avail}</TableCell>
                   <TableCell>
-                    {p.returnPending > 0 ? <Pill tone='wait'>Chờ trả kho {p.returnPending}</Pill> : p.issued >= p.qty ? <Pill tone='done'>Đã cấp đủ</Pill> : ok ? <Pill tone='info'>Đã giữ đủ</Pill> : <Pill tone={avail > 0 ? 'wait' : 'bad'}>{avail > 0 ? 'Chưa giữ' : 'Hết hàng'}</Pill>}
+                    {p.returnPending > 0 ? (
+                      <Pill tone='wait'>Chờ trả kho {p.returnPending}</Pill>
+                    ) : p.issued >= p.qty ? (
+                      <Pill tone='done'>Đã cấp đủ</Pill>
+                    ) : ok ? (
+                      <Pill tone='info'>Đã giữ đủ</Pill>
+                    ) : avail <= 0 && onOrderQty(db, wo.id, p.partId) > 0 ? (
+                      <Pill tone='wait'>Đã đề nghị mua</Pill>
+                    ) : (
+                      <Pill tone={avail > 0 ? 'wait' : 'bad'}>{avail > 0 ? 'Chưa giữ' : 'Hết hàng'}</Pill>
+                    )}
                   </TableCell>
                   {isKho && (
                     <TableCell className='text-right'>
@@ -83,7 +100,7 @@ export function WoParts({ wo, compact }: { wo: WorkOrder; compact?: boolean }) {
               Giữ linh kiện khả dụng
             </Button>
           )}
-          {needReserve && c.status === 'WO_CREATED' && (
+          {canReportShort && (
             <Button size='sm' variant='outline' onClick={() => setShortOpen(true)}>
               Báo thiếu linh kiện
             </Button>
@@ -94,23 +111,28 @@ export function WoParts({ wo, compact }: { wo: WorkOrder; compact?: boolean }) {
             </Button>
           )}
           {canIssue && !wo.technicianId && <p className='text-muted-foreground self-center text-xs'>Chờ điều phối phân công kỹ thuật viên rồi mới cấp phát (BR-15).</p>}
+          {waitingNote && <p className='text-muted-foreground self-center text-xs'>{waitingNote}</p>}
         </div>
       )}
-      {shortOpen && <Shortage wo={wo} onClose={() => setShortOpen(false)} />}
+      {shortOpen && <Shortage wo={wo} status={c.status} onClose={() => setShortOpen(false)} />}
     </div>
   )
 }
 
-function Shortage({ wo, onClose }: { wo: WorkOrder; onClose: () => void }) {
+function Shortage({ wo, status, onClose }: { wo: WorkOrder; status: CaseStatus; onClose: () => void }) {
   const me = useMe()
+  const db = useDb()
   const [note, setNote] = useState('')
-  const m = useAction(api.markShortage, { success: 'Đã báo thiếu, phiếu chuyển chờ linh kiện', onDone: onClose })
+  const moves = status === 'WO_CREATED'
+  const m = useAction(api.markShortage, { success: moves ? 'Đã báo thiếu, phiếu chuyển chờ linh kiện' : 'Đã báo thiếu, đã gửi đề nghị mua cho quản lý', onDone: onClose })
+  const lines = wo.parts.map((l) => ({ l, qty: toOrderQty(db, wo, l) })).filter((x) => x.qty > 0)
+  const where = moves ? 'Phiếu chuyển "Chờ linh kiện"' : status === 'IN_REPAIR' ? 'Phiếu vẫn "Đang sửa" theo phương án mới' : 'Phiếu vẫn "Chờ linh kiện"'
   return (
     <FormDialog
       open
       onOpenChange={onClose}
       title={`Báo thiếu linh kiện cho ${wo.code}`}
-      description='Phiếu chuyển "Chờ linh kiện", thời hạn tạm dừng tối đa 3 ngày làm việc (PARAM-17). Hệ thống tạo đề nghị mua gửi quản lý (BR-17).'
+      description={`${where}. Chỉ đề nghị mua phần không có sẵn trong kho và chưa có đề nghị (BR-17); thời hạn tạm dừng tối đa 3 ngày làm việc (PARAM-17).`}
       onSubmit={() => m.mutate([me, wo.id, note])}
       footer={
         <>
@@ -119,6 +141,9 @@ function Shortage({ wo, onClose }: { wo: WorkOrder; onClose: () => void }) {
         </>
       }
     >
+      <p className='text-sm'>
+        Sẽ đề nghị mua: {lines.map(({ l, qty }) => `${db.parts.find((x) => x.id === l.partId)?.name} × ${qty}`).join('; ') || 'không còn phần nào'}
+      </p>
       <Field label='Ghi chú (nhà cung cấp, ngày dự kiến về)'>{(id) => <Textarea id={id} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />}</Field>
     </FormDialog>
   )

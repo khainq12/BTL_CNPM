@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
+import { currentPlan, openChange } from '@/domain/plan-change'
 import { fmtDateTime, fmtMinutes, fmtMoney } from '@/domain/format'
 import { PARAMS } from '@/domain/params'
 import { CONFIRM_METHODS } from '@/domain/rules'
@@ -107,7 +108,7 @@ function Propose({ c, onClose }: P) {
       }
     >
       <p className='bg-muted rounded-md p-3 text-sm'>
-        <span className='font-medium'>Phương án hiện hành:</span> {api.currentPlan(c) || '—'}
+        <span className='font-medium'>Phương án hiện hành:</span> {currentPlan(c) || '—'}
       </p>
       <Field label='Lỗi mới phát hiện' required error={tried && errs.finding}>
         {(id) => <Textarea id={id} rows={2} value={finding} onChange={(e) => setFinding(e.target.value)} placeholder='Khi thay bàn phím phát hiện cáp màn hình bị đứt một phần' />}
@@ -127,7 +128,7 @@ function Propose({ c, onClose }: P) {
 function Review({ c, onClose }: P) {
   const me = useMe()
   const db = useDb()
-  const ch = api.openChange(c)!
+  const ch = openChange(c)!
   const [result, setResult] = useState<'MIEN_PHI' | 'CO_PHI' | 'KHONG_DONG_Y'>(c.eligibility?.decision === 'MIEN_PHI' ? 'MIEN_PHI' : 'CO_PHI')
   const [note, setNote] = useState('')
   const [items, setItems] = useState<QuoteItem[]>(() =>
@@ -190,7 +191,7 @@ function Review({ c, onClose }: P) {
 
 function SendQuote({ c, onClose }: P) {
   const me = useMe()
-  const ch = api.openChange(c)!
+  const ch = openChange(c)!
   const q = c.quotes.find((x) => x.version === ch.quoteVersion)!
   const m = useAction(api.sendPlanChangeQuote, { success: 'Đã gửi báo giá bổ sung cho khách', onDone: onClose })
   return (
@@ -214,7 +215,7 @@ function SendQuote({ c, onClose }: P) {
 
 function Response({ c, onClose }: P) {
   const me = useMe()
-  const ch = api.openChange(c)!
+  const ch = openChange(c)!
   const q = c.quotes.find((x) => x.version === ch.quoteVersion)!
   const [accepted, setAccepted] = useState<'yes' | 'no'>('yes')
   const [next, setNext] = useState<'TIEP_TUC' | 'TRA_MAY'>('TIEP_TUC')

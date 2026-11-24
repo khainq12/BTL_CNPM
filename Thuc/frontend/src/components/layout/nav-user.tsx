@@ -29,7 +29,7 @@ export function NavUser() {
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton size='lg' className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'>
                 <Avatar className='h-8 w-8 rounded-lg'>
-                  <AvatarFallback className='rounded-lg'>{initials(me.name)}</AvatarFallback>
+                  <AvatarFallback className='bg-sidebar-accent text-sidebar-accent-foreground rounded-lg'>{initials(me.name)}</AvatarFallback>
                 </Avatar>
                 <div className='grid flex-1 text-start text-sm leading-tight'>
                   <span className='truncate font-semibold'>{me.name}</span>

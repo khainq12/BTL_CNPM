@@ -67,9 +67,9 @@ function Inner() {
             </SubmitButton>
           </form>
           {rows.length === 0 ? (
-            <Empty className='rounded-lg border'>{showPast ? 'Chưa khai báo ngày nghỉ nào.' : 'Chưa có ngày nghỉ sắp tới. Thêm khi có thông báo nghỉ lễ.'}</Empty>
+            <Empty className='bg-card rounded-lg border'>{showPast ? 'Chưa khai báo ngày nghỉ nào.' : 'Chưa có ngày nghỉ sắp tới. Thêm khi có thông báo nghỉ lễ.'}</Empty>
           ) : (
-            <div className='overflow-x-auto rounded-lg border'>
+            <div className='bg-card overflow-x-auto rounded-lg border'>
               <Table>
                 <TableHeader>
                   <TableRow>

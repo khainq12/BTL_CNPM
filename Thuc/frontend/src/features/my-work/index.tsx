@@ -26,7 +26,7 @@ function Inner() {
   return (
     <PageShell title='Việc của tôi' description='Mở phiếu để ghi chẩn đoán, đánh dấu công việc và chuyển QC.'>
       {rows.length === 0 ? (
-        <Empty className='rounded-lg border'>Bạn không có việc nào đang chờ. Điều phối viên sẽ giao việc mới.</Empty>
+        <Empty className='bg-card rounded-lg border'>Bạn không có việc nào đang chờ. Điều phối viên sẽ giao việc mới.</Empty>
       ) : (
         <ul className='grid gap-3'>
           {rows.map((c) => {

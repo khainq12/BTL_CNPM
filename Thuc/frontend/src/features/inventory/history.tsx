@@ -35,7 +35,7 @@ function Inner() {
           ))}
         </NativeSelect>
       </label>
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         {rows.length === 0 ? (
           <Empty>Chưa có giao dịch.</Empty>
         ) : (

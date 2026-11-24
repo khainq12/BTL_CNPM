@@ -30,7 +30,7 @@ function Inner() {
       description='Quyền xem và thao tác theo vai trò tuân theo ma trận phân quyền. Khóa tài khoản thay vì xóa để giữ lịch sử.'
       actions={<Button onClick={() => setEdit({ role: 'TN', active: true })}>Tạo tài khoản</Button>}
     >
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         <Table>
           <TableHeader>
             <TableRow>

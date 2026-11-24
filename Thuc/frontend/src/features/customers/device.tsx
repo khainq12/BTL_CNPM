@@ -1,7 +1,7 @@
 import { useDb, useMe } from '@/api/hooks'
 import { fmtDate } from '@/domain/format'
 import { CAUSE_LABEL, DEVICE_KIND_LABEL } from '@/domain/rules'
-import { Empty, Guard, InfoList, PageShell, Section, useName } from '@/components/woms'
+import { Empty, Guard, InfoList, PageShell, Section } from '@/components/woms'
 import { CaseTable } from '@/features/cases/list'
 import { canSeeCustomer } from '@/features/cases/logic'
 
@@ -17,12 +17,11 @@ export function DeviceDetail({ id }: { id: string }) {
 function Inner({ id }: { id: string }) {
   const db = useDb()
   const me = useMe()
-  const name = useName()
   const d = db.devices.find((x) => x.id === id)
   if (!d)
     return (
       <PageShell title='Không tìm thấy thiết bị'>
-        <Empty className='rounded-lg border'>Thiết bị không tồn tại.</Empty>
+        <Empty className='bg-card rounded-lg border'>Thiết bị không tồn tại.</Empty>
       </PageShell>
     )
   const cu = db.customers.find((x) => x.id === d.customerId)!
@@ -42,7 +41,7 @@ function Inner({ id }: { id: string }) {
         />
       </Section>
       <Section title='Các lần tiếp nhận' description='Mỗi lần gửi lại thiết bị là một phiếu riêng, liên kết với thiết bị (BR-29).'>
-        {cases.length ? <CaseTable rows={cases} name={name} hideCustomer={!canSeeCustomer(me)} /> : <p className='text-muted-foreground text-sm'>Chưa có.</p>}
+        {cases.length ? <CaseTable rows={cases} hideCustomer={!canSeeCustomer(me)} /> : <p className='text-muted-foreground text-sm'>Chưa có.</p>}
       </Section>
       <Section title='Chẩn đoán trước đây'>
         <ul className='grid gap-2 text-sm'>

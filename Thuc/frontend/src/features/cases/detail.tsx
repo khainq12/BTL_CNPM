@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
 import { currentPlan, openChange } from '@/domain/plan-change'
-import { fmtDateTime, fmtMinutes, fmtMoney } from '@/domain/format'
+import { fmtDateTime, fmtDayMonth, fmtMinutes, fmtMoney } from '@/domain/format'
 import { CAUSE_LABEL, DECISION_LABEL, DEVICE_KIND_LABEL, WARRANTY_CHECK_LABEL } from '@/domain/rules'
 import { slaInfo } from '@/domain/sla'
 import { CASE_STATUS, STAGES } from '@/domain/statuses'
@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Empty, Guard, InfoList, PageShell, Pill, Section, SlaBadge, StatusBadge, useName } from '@/components/woms'
+import { DeviceIcon, Empty, Guard, InfoList, PageShell, Pill, Section, SlaMeter, StatusBadge, UserAvatar, useName } from '@/components/woms'
 import { WoParts } from '@/features/inventory/wo-parts'
 import { ActionDialog } from './actions'
 import { PhotoGallery } from './photo-picker'
@@ -40,7 +40,7 @@ function Detail({ id }: { id: string }) {
   if (!c || !canViewCase(me, c, wo))
     return (
       <PageShell title='Không mở được phiếu' crumbs={[{ label: 'Hộp việc', to: '/' }]}>
-        <Empty className='rounded-lg border'>Phiếu không tồn tại hoặc bạn không được giao xử lý phiếu này (BR-27).</Empty>
+        <Empty className='bg-card rounded-lg border'>Phiếu không tồn tại hoặc bạn không được giao xử lý phiếu này (BR-27).</Empty>
       </PageShell>
     )
 
@@ -54,7 +54,8 @@ function Detail({ id }: { id: string }) {
     <PageShell
       title={
         <span className='flex flex-wrap items-center gap-x-3 gap-y-1'>
-          {c.code}
+          <DeviceIcon kind={dev.kind} className='size-9 rounded-lg [&_svg]:size-5' />
+          <span className='tabular-nums'>{c.code}</span>
           <StatusBadge status={c.status} />
           {change && <Pill tone='wait'>{CHANGE_STATUS[change.status][0]} đổi phương án</Pill>}
         </span>
@@ -66,15 +67,15 @@ function Detail({ id }: { id: string }) {
 
       <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start'>
         <Tabs defaultValue='overview' className='min-w-0'>
-          <div className='overflow-x-auto'>
+          <div className='no-scrollbar overflow-x-auto'>
             <TabsList>
               <TabsTrigger value='overview'>Tổng quan</TabsTrigger>
-              <TabsTrigger value='diag'>Chẩn đoán</TabsTrigger>
-              <TabsTrigger value='warranty'>Bảo hành và báo giá</TabsTrigger>
-              <TabsTrigger value='wo'>Lệnh sửa chữa</TabsTrigger>
-              <TabsTrigger value='qc'>Kiểm tra chất lượng</TabsTrigger>
-              <TabsTrigger value='handover'>Bàn giao</TabsTrigger>
-              <TabsTrigger value='history'>Lịch sử</TabsTrigger>
+              <Tab value='diag' label='Chẩn đoán' empty={!c.diagnosis} />
+              <Tab value='warranty' label='Bảo hành và báo giá' empty={!c.eligibility && !c.quotes.length} count={c.quotes.length} />
+              <Tab value='wo' label='Lệnh sửa chữa' empty={!wo} />
+              <Tab value='qc' label='Kiểm tra chất lượng' empty={!c.qc.length} count={c.qc.length} />
+              <Tab value='handover' label='Bàn giao' empty={!c.handover && !c.returnConclusion} />
+              <Tab value='history' label='Lịch sử' />
             </TabsList>
           </div>
           <TabsContent value='overview' className='mt-4 grid gap-4'>
@@ -87,7 +88,7 @@ function Detail({ id }: { id: string }) {
             <WarrantyTab c={c} />
           </TabsContent>
           <TabsContent value='wo' className='mt-4'>
-            {wo ? <WoTab c={c} wo={wo} /> : <Empty className='rounded-lg border'>Chưa có lệnh sửa chữa. Lệnh được lập khi phương án sửa được xác nhận.</Empty>}
+            {wo ? <WoTab c={c} wo={wo} /> : <Empty className='bg-card rounded-lg border'>Chưa có lệnh sửa chữa. Lệnh được lập khi phương án sửa được xác nhận.</Empty>}
           </TabsContent>
           <TabsContent value='qc' className='mt-4'>
             <QcTab c={c} />
@@ -144,7 +145,7 @@ function Detail({ id }: { id: string }) {
           </Section>
           <Section title='Thời hạn xử lý'>
             <div className='grid gap-2 text-sm'>
-              <SlaBadge c={c} />
+              <SlaMeter c={c} />
               <p className='text-muted-foreground'>{sla.detail}</p>
               {sla.dueAt && <p>Hạn: {fmtDateTime(sla.dueAt)}</p>}
               {c.sla.pauses.map((p, i) => (
@@ -162,25 +163,54 @@ function Detail({ id }: { id: string }) {
   )
 }
 
-function Stepper({ c }: { c: WarrantyCase }) {
-  const idx = STAGES.findIndex((s) => s.statuses.includes(c.status))
-  if (c.status === 'CANCELLED') return <p className='text-muted-foreground text-sm'>Phiếu đã hủy: {c.cancelReason}</p>
+// Thẻ có dữ liệu thì đậm, chưa có thì mờ (vẫn bấm được); số lần nếu có nhiều bản ghi.
+function Tab({ value, label, empty, count }: { value: string; label: string; empty?: boolean; count?: number }) {
   return (
-    <ol className='flex flex-wrap gap-x-1 gap-y-2 text-sm' aria-label='Tiến trình phiếu'>
-      {STAGES.map((s, i) => {
-        const done = i < idx || c.status === 'COMPLETED'
-        const cur = i === idx && c.status !== 'COMPLETED'
-        return (
-          <li key={s.label} className='flex items-center gap-1'>
-            <span className={cn('flex items-center gap-1.5 rounded-full px-2.5 py-1', cur && 'bg-primary text-primary-foreground font-medium', done && 'text-foreground', !done && !cur && 'text-muted-foreground')} aria-current={cur ? 'step' : undefined}>
-              {done ? <Check className='size-3.5' aria-hidden /> : <Circle className='size-3' aria-hidden />}
-              {s.label}
-            </span>
-            {i < STAGES.length - 1 && <span className='bg-border h-px w-3' aria-hidden />}
-          </li>
-        )
-      })}
-    </ol>
+    <TabsTrigger value={value} className={cn(empty && 'text-muted-foreground/70')}>
+      {label}
+      {count ? <span className='bg-muted text-muted-foreground rounded-full px-1.5 text-[11px] leading-4 tabular-nums'>{count}</span> : null}
+    </TabsTrigger>
+  )
+}
+
+function Stepper({ c }: { c: WarrantyCase }) {
+  const name = useName()
+  const idx = STAGES.findIndex((s) => s.statuses.includes(c.status))
+  // Lúc phiếu vào mỗi bước: lần đầu chuyển sang một trạng thái của bước đó (bước đầu là lúc tạo phiếu).
+  const entered = STAGES.map((s, i) => (i === 0 ? { at: c.createdAt, by: c.receivedBy } : c.events.find((e) => e.to && s.statuses.includes(e.to))))
+  if (c.status === 'CANCELLED') return <p className='text-muted-foreground text-sm'>Phiếu đã hủy: {c.cancelReason}</p>
+  const finished = c.status === 'COMPLETED'
+  return (
+    <div className='bg-card overflow-x-auto rounded-xl border px-4 py-3'>
+      <ol className='grid min-w-[44rem] grid-cols-8' aria-label='Tiến trình phiếu'>
+        {STAGES.map((s, i) => {
+          const done = i < idx || finished
+          const cur = i === idx && !finished
+          return (
+            <li key={s.label} className='relative flex flex-col items-center gap-1.5 text-center text-xs' aria-current={cur ? 'step' : undefined}>
+              {i > 0 && <span className={cn('absolute top-3 right-1/2 h-0.5 w-full -translate-y-1/2', i <= idx || finished ? 'bg-primary' : 'bg-border')} aria-hidden />}
+              <span
+                className={cn(
+                  'relative z-10 flex size-6 items-center justify-center rounded-full border-2 text-[11px] font-semibold tabular-nums',
+                  done && 'border-primary bg-primary text-primary-foreground',
+                  cur && 'border-primary bg-card text-primary ring-primary/20 ring-4',
+                  !done && !cur && 'border-border bg-card text-muted-foreground'
+                )}
+              >
+                {done ? <Check className='size-3.5' strokeWidth={3} aria-hidden /> : i + 1}
+              </span>
+              <span className={cn('px-1 leading-tight', cur ? 'text-foreground font-semibold' : done ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</span>
+              {(done || cur) && entered[i] && (
+                <time dateTime={entered[i].at} title={`Vào bước lúc ${fmtDateTime(entered[i].at)}${entered[i].by ? `, ${name(entered[i].by)}` : ''}`} className='text-muted-foreground -mt-1 text-[11px] tabular-nums'>
+                  {fmtDayMonth(entered[i].at)}
+                </time>
+              )}
+              <span className='sr-only'>{done ? '(đã xong)' : cur ? '(bước hiện tại)' : '(chưa tới)'}</span>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
   )
 }
 
@@ -244,7 +274,7 @@ function DiagnosisTab({ c }: { c: WarrantyCase }) {
   const name = useName()
   const db = useDb()
   const d = c.diagnosis
-  if (!d) return <Empty className='rounded-lg border'>{c.diagnosisTechId ? `${name(c.diagnosisTechId)} đang chẩn đoán.` : 'Chưa giao kỹ thuật viên chẩn đoán.'}</Empty>
+  if (!d) return <Empty className='bg-card rounded-lg border'>{c.diagnosisTechId ? `${name(c.diagnosisTechId)} đang chẩn đoán.` : 'Chưa giao kỹ thuật viên chẩn đoán.'}</Empty>
   return (
     <Section title='Biên bản chẩn đoán' description={`${name(d.by)} · ${fmtDateTime(d.at)}`}>
       <InfoList
@@ -402,7 +432,7 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
 
 function QcTab({ c }: { c: WarrantyCase }) {
   const name = useName()
-  if (!c.qc.length) return <Empty className='rounded-lg border'>Chưa kiểm tra chất lượng.</Empty>
+  if (!c.qc.length) return <Empty className='bg-card rounded-lg border'>Chưa kiểm tra chất lượng.</Empty>
   return (
     <div className='grid gap-4'>
       {c.qc
@@ -457,7 +487,7 @@ function HandoverTab({ c }: { c: WarrantyCase }) {
           />
         </Section>
       ) : (
-        !c.returnConclusion && <Empty className='rounded-lg border'>Chưa bàn giao.</Empty>
+        !c.returnConclusion && <Empty className='bg-card rounded-lg border'>Chưa bàn giao.</Empty>
       )}
     </div>
   )
@@ -465,27 +495,43 @@ function HandoverTab({ c }: { c: WarrantyCase }) {
 
 function HistoryTab({ c }: { c: WarrantyCase }) {
   const name = useName()
+  const events = c.events.slice().reverse()
+  const day = (iso: string) => new Date(iso).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+  const time = (iso: string) => new Date(iso).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' })
   return (
     <Section title='Lịch sử xử lý' description='Không ai sửa được lịch sử (BR-28).'>
-      <ol className='grid gap-3'>
-        {c.events
-          .slice()
-          .reverse()
-          .map((e, i) => (
-            <li key={i} className='border-l-2 ps-3 text-sm'>
-              <div className='font-medium'>{e.action}</div>
-              {e.to && (
-                <div className='text-muted-foreground'>
-                  {e.from ? `${CASE_STATUS[e.from].label} → ` : ''}
-                  {CASE_STATUS[e.to].label}
+      <ol className='grid'>
+        {events.map((e, i) => {
+          const newDay = i === 0 || day(events[i - 1].at) !== day(e.at)
+          return (
+            <li key={i} className='grid'>
+              {newDay && <div className={cn('text-muted-foreground mb-2 text-xs font-medium first-letter:uppercase', i > 0 && 'mt-3')}>{day(e.at)}</div>}
+              <div className='relative grid grid-cols-[3rem_1.25rem_minmax(0,1fr)] gap-x-2 pb-4'>
+                <time dateTime={e.at} className='text-muted-foreground pt-0.5 text-xs tabular-nums'>
+                  {time(e.at)}
+                </time>
+                <span className='relative flex justify-center' aria-hidden>
+                  {i < events.length - 1 && <span className='bg-muted-foreground/30 absolute top-4 -bottom-4 w-px' />}
+                  <span className={cn('mt-1 size-2.5 rounded-full ring-4 ring-card', e.to ? 'bg-primary' : 'bg-muted-foreground/50')} />
+                </span>
+                <div className='grid gap-0.5 text-sm'>
+                  <div className='font-medium'>{e.action}</div>
+                  {e.to && (
+                    <div className='text-muted-foreground'>
+                      {e.from ? `${CASE_STATUS[e.from].label} → ` : ''}
+                      {CASE_STATUS[e.to].label}
+                    </div>
+                  )}
+                  {e.note && <div>{e.note}</div>}
+                  <div className='text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs'>
+                    <UserAvatar id={e.by} className='size-5 text-[9px]' />
+                    {name(e.by)}
+                  </div>
                 </div>
-              )}
-              {e.note && <div>{e.note}</div>}
-              <div className='text-muted-foreground text-xs'>
-                {name(e.by)} · {fmtDateTime(e.at)}
               </div>
             </li>
-          ))}
+          )
+        })}
       </ol>
     </Section>
   )

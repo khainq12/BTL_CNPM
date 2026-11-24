@@ -5,7 +5,8 @@ import { PARAMS } from '@/domain/params'
 import type { WarrantyCase } from '@/domain/types'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { CaseLink, Empty, Guard, PageShell, Pill, Section, SlaBadge, StatusBadge, useName } from '@/components/woms'
+import { CaseLink, Empty, Guard, PageShell, Pill, Section, SlaBadge, StatusBadge, UserAvatar, useName } from '@/components/woms'
+import { cn } from '@/lib/utils'
 import { ActionDialog } from '@/features/cases/actions'
 import { techLoad } from '@/features/cases/logic'
 
@@ -36,14 +37,27 @@ function Inner() {
           const l = techLoad(db, t.id)
           const minutes = db.workOrders.filter((w) => w.technicianId === t.id).flatMap((w) => w.tasks.filter((x) => !x.done)).reduce((s, x) => s + x.minutes, 0)
           return (
-            <div key={t.id} className='bg-card flex items-center justify-between gap-3 rounded-lg border p-4'>
-              <div>
-                <p className='font-medium'>{t.name}</p>
-                <p className='text-muted-foreground text-sm'>
-                  {l.wo} lệnh sửa · {l.diag} chẩn đoán · còn khoảng {fmtMinutes(minutes)}
-                </p>
+            <div key={t.id} className='bg-card grid gap-3 rounded-lg border p-4'>
+              <div className='flex items-center gap-3'>
+                <UserAvatar id={t.id} className='size-9 text-xs' />
+                <div className='min-w-0 flex-1'>
+                  <p className='font-medium'>{t.name}</p>
+                  <p className='text-muted-foreground text-sm'>
+                    {l.wo} lệnh sửa · {l.diag} chẩn đoán · còn khoảng {fmtMinutes(minutes)}
+                  </p>
+                </div>
+                {l.overloaded ? <Pill tone='wait'>Quá tải</Pill> : <Pill>Bình thường</Pill>}
               </div>
-              {l.overloaded ? <Pill tone='wait'>Quá tải</Pill> : <Pill>Bình thường</Pill>}
+              <div
+                role='meter'
+                aria-label={`Số việc dở dang của ${t.name}`}
+                aria-valuemin={0}
+                aria-valuemax={PARAMS.technicianOverload}
+                aria-valuenow={l.total}
+                className={cn('h-1.5 overflow-hidden rounded-full', l.overloaded ? 'bg-amber-100 dark:bg-amber-950' : 'bg-meter-ok-track')}
+              >
+                <div className={cn('h-full rounded-full', l.overloaded ? 'bg-amber-500' : 'bg-meter-ok')} style={{ width: `${Math.min(100, Math.max(l.total ? 4 : 0, (l.total / PARAMS.technicianOverload) * 100))}%` }} />
+              </div>
             </div>
           )
         })}

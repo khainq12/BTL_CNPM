@@ -17,7 +17,7 @@ function Inner() {
   const rows = db.cases.filter((c) => c.status === 'PENDING_ACCEPT').sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   return (
     <PageShell title='Yêu cầu trực tuyến' description='Khách gửi qua Customer Portal. Khi khách mang máy tới, mở phiếu và chọn "Nhận máy, lập biên nhận".'>
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         {rows.length === 0 ? (
           <Empty>Không có yêu cầu nào đang chờ khách mang máy tới.</Empty>
         ) : (

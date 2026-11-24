@@ -57,7 +57,7 @@ function Inner() {
 function ApprovalList({ rows, onOpen }: { rows: Approval[]; onOpen?: (a: Approval) => void }) {
   const name = useName()
   const db = useDb()
-  if (!rows.length) return <Empty className='rounded-lg border'>Không có đề nghị.</Empty>
+  if (!rows.length) return <Empty className='bg-card rounded-lg border'>Không có đề nghị.</Empty>
   return (
     <ul className='bg-card divide-y rounded-lg border'>
       {rows.map((a) => {

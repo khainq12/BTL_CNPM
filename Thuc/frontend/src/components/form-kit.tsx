@@ -82,21 +82,21 @@ type Shell = {
 export function FormDialog({ open, onOpenChange, title, description, children, footer, onSubmit, wide }: Shell) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(wide && 'sm:max-w-2xl')}>
+      <DialogContent className={cn('bg-card flex max-h-[calc(100svh-2rem)] flex-col gap-0 overflow-hidden p-0', wide && 'sm:max-w-2xl')}>
         <form
           noValidate
           onSubmit={(e) => {
             e.preventDefault()
             onSubmit()
           }}
-          className='grid gap-4'
+          className='flex min-h-0 flex-1 flex-col'
         >
-          <DialogHeader>
+          <DialogHeader className='border-b px-6 pt-6 pb-4 pe-12'>
             <DialogTitle>{title}</DialogTitle>
             {description && <DialogDescription>{description}</DialogDescription>}
           </DialogHeader>
-          {children}
-          <DialogFooter>{footer}</DialogFooter>
+          <div className='grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-6 py-5'>{children}</div>
+          <DialogFooter className='bg-muted/40 border-t px-6 py-4'>{footer}</DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

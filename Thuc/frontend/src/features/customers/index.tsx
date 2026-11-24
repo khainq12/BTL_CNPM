@@ -26,7 +26,7 @@ function Inner() {
         Tìm khách
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder='0912345678 hoặc Nguyễn Thị Mai' />
       </label>
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         {rows.length === 0 ? (
           <Empty>Không tìm thấy khách. Khách mới được tạo hồ sơ khi lập phiếu tiếp nhận.</Empty>
         ) : (

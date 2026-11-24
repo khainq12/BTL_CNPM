@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router'
 import { useDb } from '@/api/hooks'
 import { DEVICE_KIND_LABEL } from '@/domain/rules'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Empty, Guard, InfoList, PageShell, Section, useName } from '@/components/woms'
+import { Empty, Guard, InfoList, PageShell, Section } from '@/components/woms'
 import { CaseTable } from '@/features/cases/list'
 
 export function CustomerDetail({ id }: { id: string }) {
@@ -15,12 +15,11 @@ export function CustomerDetail({ id }: { id: string }) {
 
 function Inner({ id }: { id: string }) {
   const db = useDb()
-  const name = useName()
   const c = db.customers.find((x) => x.id === id)
   if (!c)
     return (
       <PageShell title='Không tìm thấy khách hàng' crumbs={[{ label: 'Khách hàng', to: '/khach-hang' }]}>
-        <Empty className='rounded-lg border'>Hồ sơ khách không tồn tại.</Empty>
+        <Empty className='bg-card rounded-lg border'>Hồ sơ khách không tồn tại.</Empty>
       </PageShell>
     )
   const devices = db.devices.filter((d) => d.customerId === id)
@@ -59,7 +58,7 @@ function Inner({ id }: { id: string }) {
         )}
       </Section>
       <Section title='Các phiếu bảo hành'>
-        {cases.length ? <CaseTable rows={cases} name={name} hideCustomer /> : <p className='text-muted-foreground text-sm'>Chưa có phiếu.</p>}
+        {cases.length ? <CaseTable rows={cases} hideCustomer /> : <p className='text-muted-foreground text-sm'>Chưa có phiếu.</p>}
       </Section>
     </PageShell>
   )

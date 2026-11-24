@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { NativeSelect } from '@/components/form-kit'
-import { CaseLink, Empty, Guard, PageShell, SlaBadge, StatusBadge, useName } from '@/components/woms'
+import { CaseLink, DeviceIcon, Empty, Guard, PageShell, SlaBadge, StatusBadge, UserChip } from '@/components/woms'
 
 const PAGE = 15
 
@@ -25,7 +25,6 @@ export function CaseList() {
 function List() {
   const db = useDb()
   const me = useMe()
-  const name = useName()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<'' | 'OPEN' | CaseStatus>('OPEN')
   const [sla, setSla] = useState('')
@@ -88,11 +87,11 @@ function List() {
           </NativeSelect>
         </label>
       </form>
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         {rows.length === 0 ? (
           <Empty>Không có phiếu phù hợp. Thử tìm bằng số điện thoại hoặc mã phiếu, hoặc chọn "Tất cả" trạng thái.</Empty>
         ) : (
-          <CaseTable rows={pageRows} name={name} />
+          <CaseTable rows={pageRows} />
         )}
       </div>
       {pages > 1 && (
@@ -112,7 +111,7 @@ function List() {
   )
 }
 
-export function CaseTable({ rows, name, hideCustomer }: { rows: WarrantyCase[]; name: (id?: string) => string; hideCustomer?: boolean }) {
+export function CaseTable({ rows, hideCustomer }: { rows: WarrantyCase[]; hideCustomer?: boolean }) {
   const db = useDb()
   return (
     <Table>
@@ -124,7 +123,6 @@ export function CaseTable({ rows, name, hideCustomer }: { rows: WarrantyCase[]; 
           <TableHead>Trạng thái</TableHead>
           <TableHead>Thời hạn</TableHead>
           <TableHead>Phụ trách</TableHead>
-          <TableHead>Tiếp nhận</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -136,16 +134,23 @@ export function CaseTable({ rows, name, hideCustomer }: { rows: WarrantyCase[]; 
             <TableRow key={c.id}>
               <TableCell>
                 <CaseLink c={c} />
-                <div className='text-muted-foreground text-xs'>{c.channel === 'ONLINE' ? 'Trực tuyến' : 'Tại quầy'}</div>
+                <div className='text-muted-foreground text-xs'>
+                  {c.channel === 'ONLINE' ? 'Trực tuyến' : 'Tại quầy'}, {fmtDateTime(c.receivedAt ?? c.createdAt)}
+                </div>
               </TableCell>
               {!hideCustomer && (
-                <TableCell>
+                <TableCell className='min-w-36 whitespace-normal'>
                   {cu.name}
                   <div className='text-muted-foreground text-xs'>{cu.phone}</div>
                 </TableCell>
               )}
-              <TableCell>
-                {d.brand} {d.model}
+              <TableCell className='min-w-44 whitespace-normal'>
+                <span className='flex items-center gap-2'>
+                  <DeviceIcon kind={d.kind} className='size-6' />
+                  <span>
+                    {d.brand} {d.model}
+                  </span>
+                </span>
               </TableCell>
               <TableCell>
                 <StatusBadge status={c.status} />
@@ -153,8 +158,9 @@ export function CaseTable({ rows, name, hideCustomer }: { rows: WarrantyCase[]; 
               <TableCell>
                 <SlaBadge c={c} />
               </TableCell>
-              <TableCell>{wo?.technicianId ? name(wo.technicianId) : c.diagnosisTechId ? name(c.diagnosisTechId) : '—'}</TableCell>
-              <TableCell className='whitespace-nowrap'>{fmtDateTime(c.receivedAt ?? c.createdAt)}</TableCell>
+              <TableCell>
+                <UserChip id={wo?.technicianId ?? c.diagnosisTechId} />
+              </TableCell>
             </TableRow>
           )
         })}

@@ -126,9 +126,10 @@ function Thumb({ photo }: { photo: Photo }) {
   return photo.src ? (
     <img src={photo.src} alt={photo.name} className='size-full object-cover' />
   ) : (
-    <span className='bg-muted text-muted-foreground flex size-full flex-col items-center justify-center gap-1 p-1 text-center text-[11px] break-all'>
-      <ImageIcon className='size-4' aria-hidden />
-      {photo.name}
+    // Dữ liệu mẫu chỉ có tên tệp, chưa có ảnh: hiện khung giữ chỗ kèm tên để vẫn đối chiếu được.
+    <span className='bg-accent/50 text-accent-foreground flex size-full flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(135deg,transparent_0_6px,var(--accent)_6px_7px)] p-1 text-center text-[10px] leading-tight break-all' title='Dữ liệu mẫu chỉ có tên tệp'>
+      <ImageIcon className='size-5 opacity-70' aria-hidden />
+      {photo.name.replace(/\.[a-z]+$/i, '')}
     </span>
   )
 }

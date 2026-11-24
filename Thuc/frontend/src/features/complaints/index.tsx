@@ -32,7 +32,7 @@ function Inner() {
   return (
     <PageShell title='Khiếu nại' description='CSKH tiếp nhận và giải đáp; vượt thẩm quyền thì chuyển quản lý. Ghi nhận khiếu nại mới từ trang chi tiết phiếu.'>
       {rows.length === 0 ? (
-        <Empty className='rounded-lg border'>Chưa có khiếu nại.</Empty>
+        <Empty className='bg-card rounded-lg border'>Chưa có khiếu nại.</Empty>
       ) : (
         <ul className='bg-card divide-y rounded-lg border'>
           {rows.map((q) => {

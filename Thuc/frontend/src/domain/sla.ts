@@ -156,3 +156,10 @@ export const SLA_RANK: Record<SlaKind, number> = {
   pickup: 6,
   stopped: 7,
 }
+
+// Số phút làm việc còn lại tới hạn (âm nếu đã quá). Đang tạm dừng thì hạn dời theo thời gian dừng nên giá trị giữ nguyên.
+export function slaLeftMinutes(c: WarrantyCase, now = Date.now()) {
+  const s = slaInfo(c, now)
+  if (s.remaining !== undefined) return s.remaining
+  return s.dueAt ? workingMinutesBetween(now, Date.parse(s.dueAt)) : undefined
+}

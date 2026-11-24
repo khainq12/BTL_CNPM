@@ -39,3 +39,21 @@ export function initials(name: string) {
   const parts = name.trim().split(/\s+/)
   return (parts.length > 1 ? parts[parts.length - 2][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase()
 }
+
+// Thời gian tương đối để dò nhanh ("2 giờ trước"); ngày giờ đầy đủ hiện khi rê chuột.
+export function fmtAgo(iso?: string, now = Date.now()) {
+  if (!iso) return '—'
+  const m = Math.floor((now - Date.parse(iso)) / 60_000)
+  if (m < 1) return 'vừa xong'
+  if (m < 60) return `${m} phút trước`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} giờ trước`
+  const d = Math.floor(h / 24)
+  return d < 7 ? `${d} ngày trước` : fmtDateTime(iso)
+}
+
+// Ngày và tháng ngắn gọn (21/11), giờ Việt Nam.
+export function fmtDayMonth(iso: string) {
+  const p = Object.fromEntries(dt.formatToParts(new Date(iso)).map((x) => [x.type, x.value]))
+  return `${p.day}/${p.month}`
+}

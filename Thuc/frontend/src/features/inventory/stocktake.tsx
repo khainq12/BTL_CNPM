@@ -30,7 +30,7 @@ function Inner() {
 
   return (
     <PageShell title='Kiểm kê' description='Nhập số lượng đếm được. Dòng có chênh lệch cần ghi nguyên nhân và gửi quản lý duyệt trước khi điều chỉnh.'>
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         <Table>
           <TableHeader>
             <TableRow>

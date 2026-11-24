@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { AlarmClock, CirclePause, ClockAlert, ListTodo } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useDb, useMe } from '@/api/hooks'
-import { fmtDateTime } from '@/domain/format'
+import { fmtAgo, fmtDateTime } from '@/domain/format'
 import { PARAMS } from '@/domain/params'
 import { ROLE_LABEL } from '@/domain/roles'
 import { shortageNeedsAction } from '@/domain/parts'
@@ -9,9 +12,37 @@ import type { WarrantyCase } from '@/domain/types'
 import { canSeeCustomer } from '@/features/cases/logic'
 import { openChange } from '@/domain/plan-change'
 import { Button } from '@/components/ui/button'
-import { CaseLink, Empty, PageShell, Pill, SlaBadge, StatusBadge } from '@/components/woms'
+import { CaseLink, DeviceIcon, Empty, PageShell, Pill, SlaBadge, StatusBadge } from '@/components/woms'
 
 type Queue = { title: string; hint?: string; rows: WarrantyCase[]; empty: string; link?: { to: string; label: string } }
+
+// Bộ lọc theo mức gấp của thời hạn, dùng cho hàng số liệu đầu trang.
+type Focus = 'all' | 'overdue' | 'soon' | 'paused'
+const FOCUS_MATCH: Record<Focus, (c: WarrantyCase) => boolean> = {
+  all: () => true,
+  overdue: (c) => ['overdue', 'pickup_late'].includes(slaInfo(c).kind),
+  soon: (c) => slaInfo(c).kind === 'soon',
+  paused: (c) => slaInfo(c).kind === 'paused',
+}
+const TILES: { key: Focus; label: string; icon: typeof ListTodo; tone: string }[] = [
+  { key: 'all', label: 'Việc đang chờ bạn', icon: ListTodo, tone: 'text-primary' },
+  { key: 'overdue', label: 'Quá hạn', icon: ClockAlert, tone: 'text-red-600 dark:text-red-400' },
+  { key: 'soon', label: 'Sắp quá hạn', icon: AlarmClock, tone: 'text-amber-600 dark:text-amber-400' },
+  { key: 'paused', label: 'Đang tạm dừng', icon: CirclePause, tone: 'text-slate-500 dark:text-slate-400' },
+]
+const FOCUS_EMPTY: Record<Focus, string> = {
+  all: 'Bạn đã xử lý hết việc. Phiếu mới sẽ hiện ở đây.',
+  overdue: 'Không có phiếu quá hạn trong việc của bạn.',
+  soon: 'Không có phiếu sắp quá hạn trong việc của bạn.',
+  paused: 'Không có phiếu đang tạm dừng trong việc của bạn.',
+}
+
+// Lời chào theo buổi (giờ Việt Nam), gọi bằng tên (từ cuối của họ tên).
+function greeting(name: string) {
+  const h = (new Date().getUTCHours() + 7) % 24
+  const part = h < 11 ? 'buổi sáng' : h < 13 ? 'buổi trưa' : h < 18 ? 'buổi chiều' : 'buổi tối'
+  return `Chào ${part}, ${name.trim().split(/\s+/).at(-1)}`
+}
 
 const DAY = 86400_000
 const since = (iso?: string) => (iso ? Math.floor((Date.now() - Date.parse(iso)) / DAY) : 0)
@@ -20,6 +51,7 @@ const lastEventAt = (c: WarrantyCase) => c.events.at(-1)?.at ?? c.createdAt
 export function Inbox() {
   const db = useDb()
   const me = useMe()
+  const [focus, setFocus] = useState<Focus>('all')
   const wo = (c: WarrantyCase) => db.workOrders.find((w) => w.id === c.workOrderId)
   const by = (...s: WarrantyCase['status'][]) => db.cases.filter((c) => s.includes(c.status))
   const urgent = db.cases.filter((c) => ['overdue', 'soon', 'pickup_late'].includes(slaInfo(c).kind))
@@ -94,8 +126,43 @@ export function Inbox() {
   const pendingApprovals = db.approvals.filter((a) => a.status === 'CHO_DUYET' && !a.caseId).length
   const lowStock = db.parts.filter((p) => p.onHand - p.reserved < PARAMS.minStock).length
 
+  // Các phiếu trong hộp việc của vai trò (một phiếu có thể nằm ở nhiều mục, chỉ đếm một lần).
+  const mine = [...new Map(q.flatMap((x) => x.rows).map((c) => [c.id, c])).values()]
+  const count = (f: Focus) => mine.filter(FOCUS_MATCH[f]).length
+  const shown = q.map((x) => ({ ...x, rows: x.rows.filter(FOCUS_MATCH[focus]) }))
+  const filled = shown.filter((x) => x.rows.length > 0)
+  const quiet = shown.filter((x) => x.rows.length === 0)
+
   return (
-    <PageShell title='Hộp việc' description={`${me.name} · ${ROLE_LABEL[me.role]}. Việc được sắp theo mức gấp của thời hạn.`}>
+    <PageShell title='Hộp việc' description={`${greeting(me.name)} (${ROLE_LABEL[me.role]}). Việc được sắp theo mức gấp của thời hạn.`}>
+      <div role='group' aria-label='Tổng quan và lọc theo thời hạn' className='bg-card grid grid-cols-2 overflow-hidden rounded-xl border md:grid-cols-4'>
+        {TILES.map((t, i) => {
+          const n = count(t.key)
+          const on = focus === t.key
+          return (
+            <button
+              key={t.key}
+              type='button'
+              aria-pressed={on}
+              onClick={() => setFocus(on ? 'all' : t.key)}
+              className={cn(
+                'focus-visible:ring-ring/50 relative flex flex-col items-start gap-1 px-5 py-4 text-start transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-inset',
+                i % 2 === 1 && 'border-s',
+                i === 2 && 'md:border-s',
+                i >= 2 && 'max-md:border-t',
+                on ? 'bg-accent/60' : 'hover:bg-muted/60'
+              )}
+            >
+              {on && <span className='bg-primary absolute inset-x-0 bottom-0 h-0.5' aria-hidden />}
+              <span className='text-muted-foreground flex items-center gap-1.5 text-sm'>
+                <t.icon className={cn('size-4', n > 0 ? t.tone : 'text-muted-foreground')} aria-hidden />
+                {t.label}
+              </span>
+              <span className={cn('text-3xl font-semibold tracking-tight tabular-nums', n === 0 && 'text-muted-foreground/70')}>{n}</span>
+            </button>
+          )
+        })}
+      </div>
       {me.role === 'QL' && pendingApprovals > 0 && (
         <Notice>
           Có {pendingApprovals} đề nghị về kho chờ duyệt (mua linh kiện, điều chỉnh tồn).{' '}
@@ -112,10 +179,31 @@ export function Inbox() {
           </Link>
         </Notice>
       )}
+      {focus !== 'all' && (
+        <p className='-mt-2 text-sm'>
+          Đang lọc: {TILES.find((t) => t.key === focus)!.label.toLowerCase()}.{' '}
+          <button type='button' className='font-medium underline underline-offset-4' onClick={() => setFocus('all')}>
+            Bỏ lọc
+          </button>
+        </p>
+      )}
       <div className='grid gap-6'>
-        {q.map((x) => (
+        {filled.map((x) => (
           <QueueBlock key={x.title} q={x} showCustomer={canSeeCustomer(me)} />
         ))}
+        {filled.length === 0 && <Empty className='bg-card rounded-lg border'>{FOCUS_EMPTY[focus]}</Empty>}
+        {quiet.length > 0 && (
+          <section aria-label='Mục không có việc' className='text-muted-foreground border-t pt-4 text-sm'>
+            <h2 className='text-foreground mb-1 font-medium'>
+              {focus === 'all' ? `Không có việc ở ${quiet.length} mục` : `Không có phiếu ${TILES.find((t) => t.key === focus)!.label.toLowerCase()} ở ${quiet.length} mục`}
+            </h2>
+            <ul className='flex flex-wrap gap-x-5 gap-y-1'>
+              {quiet.map((x) => (
+                <li key={x.title}>{x.title}</li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </PageShell>
   )
@@ -149,18 +237,23 @@ function QueueBlock({ q, showCustomer }: { q: Queue; showCustomer: boolean }) {
             const cu = db.customers.find((x) => x.id === c.customerId)!
             const d = db.devices.find((x) => x.id === c.deviceId)!
             return (
-              <div key={c.id} className='flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm'>
-                <div className='w-44'>
-                  <CaseLink c={c} />
+              <div key={c.id} className='hover:bg-accent/30 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm transition-colors lg:grid lg:grid-cols-[10.5rem_minmax(0,1fr)_14rem_8rem_6.5rem]'>
+                <CaseLink c={c} />
+                <div className='flex min-w-48 flex-1 items-center gap-2.5'>
+                  <DeviceIcon kind={d.kind} />
+                  <span className='min-w-0'>
+                    {d.brand} {d.model}
+                    {showCustomer && <span className='text-muted-foreground block text-xs'>{cu.name}</span>}
+                  </span>
                 </div>
-                <div className='min-w-48 flex-1'>
-                  {d.brand} {d.model}
-                  {showCustomer && <span className='text-muted-foreground'> · {cu.name}</span>}
+                <div className='flex flex-wrap items-center gap-1.5'>
+                  <StatusBadge status={c.status} />
+                  {c.status === 'QUOTED' && since(c.quotes.at(-1)?.sentAt) >= PARAMS.quoteWaitDays && <Pill tone='wait'>Gọi lại khách</Pill>}
                 </div>
-                <StatusBadge status={c.status} />
                 <SlaBadge c={c} />
-                {c.status === 'QUOTED' && since(c.quotes.at(-1)?.sentAt) >= PARAMS.quoteWaitDays && <Pill tone='wait'>Gọi lại khách</Pill>}
-                <span className='text-muted-foreground w-36 text-right text-xs'>Cập nhật {fmtDateTime(lastEventAt(c))}</span>
+                <time dateTime={lastEventAt(c)} title={`Cập nhật ${fmtDateTime(lastEventAt(c))}`} className='text-muted-foreground text-xs lg:text-right'>
+                  {fmtAgo(lastEventAt(c))}
+                </time>
               </div>
             )
           })

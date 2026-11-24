@@ -1,0 +1,248 @@
+KỊCH BẢN DEMO - STAFF WORKSPACE (TV6)
+WOMS - Giao diện nội bộ cho nhân viên trung tâm bảo hành
+
+Thời lượng đề xuất: khoảng 15 phút
+  - Mở đầu: 1 phút
+  - Luồng chính (một máy đi trọn vòng đời): 9-10 phút
+  - Các điểm nổi bật: 4-5 phút, chọn theo thời gian còn lại
+Nếu chỉ có khoảng 7 phút: dùng bản rút gọn ở mục F.
+Các câu trong ngoặc kép là lời nói gợi ý, không cần đọc nguyên văn.
+
+
+A. CHUẨN BỊ TRƯỚC BUỔI DEMO (làm trước khoảng 10 phút)
+------------------------------------------------------
+
+1. Mở terminal trong thư mục Thuc/frontend:
+     npm install        (chỉ cần lần đầu)
+     npm run dev
+   Mở http://localhost:5173
+   Node phải từ bản 20.19 trở lên (hoặc 22.12 trở lên), Vite 8 không chạy trên Node cũ.
+
+2. Ở trang đăng nhập, bấm "Khôi phục dữ liệu mẫu" để dữ liệu về trạng thái ban đầu.
+   Làm lại bước này nếu đã thử trước đó, vì mã phiếu và mã lệnh trong kịch bản tính từ dữ liệu mẫu.
+
+3. Chuẩn bị sẵn 1 ảnh JPG hoặc PNG (ảnh một chiếc laptop bất kỳ) trên Desktop.
+   Tạo phiếu bắt buộc có ít nhất 1 ảnh hiện trạng.
+
+4. Mật khẩu chung của mọi tài khoản mẫu: xem hằng DEMO_PASSWORD trong src/mock/seed.ts.
+   Ghi sẵn ra giấy danh sách tên đăng nhập dùng trong buổi demo:
+     tiepnhan, cskh, dieuphoi, ktv.an, kho, qc, quanly, tiepnhan2 (tài khoản bị khóa)
+
+5. Phóng to trình duyệt 110-125% để cả phòng nhìn rõ.
+   Dùng cửa sổ trình duyệt thường, không dùng cửa sổ ẩn danh
+   (ẩn danh có bộ nhớ riêng, sẽ không thấy dữ liệu đã thao tác).
+
+6. Cách đổi vai trò trong lúc demo: bấm tên người dùng ở góc dưới bên trái, chọn "Đăng xuất",
+   xác nhận, rồi đăng nhập tài khoản khác. Mỗi lần đổi mất khoảng 10-15 giây.
+
+
+B. MỞ ĐẦU (1 phút)
+------------------
+
+"Phần của em là Staff Workspace, giao diện nội bộ cho 7 vai trò trong trung tâm: tiếp nhận, CSKH,
+điều phối, kỹ thuật viên, kho, kiểm tra chất lượng và quản lý. Mỗi tài khoản một vai trò, đăng nhập
+vào thì chỉ thấy menu và nút thao tác đúng với vai trò đó."
+
+"Hiện chưa có backend của TV4 nên em dựng một lớp dịch vụ giả, lưu dữ liệu trong trình duyệt.
+Mỗi hàm trong lớp này tương ứng một API dự kiến và kiểm tra quyền, kiểm tra quy tắc nghiệp vụ
+giống backend. Khi có API thật thì chỉ thay phần thân hàm."
+
+"Em sẽ cho một chiếc laptop đi trọn vòng đời từ lúc khách mang đến đến lúc trả máy,
+sau đó demo vài tình huống đặc biệt."
+
+
+C. LUỒNG CHÍNH: MỘT MÁY ĐI TRỌN VÒNG ĐỜI (9-10 phút)
+-----------------------------------------------------
+
+Tình huống: khách Nguyễn Thị Mai, số điện thoại 0912345678, mang laptop Dell Latitude 5420
+(máy đã đăng ký, mua khoảng 5 tháng trước, còn bảo hành) đến quầy vì pin phồng, không sạc được.
+
+Bước 1. Tài khoản bị khóa (15 giây)
+  - Đăng nhập tiepnhan2.
+  - Hệ thống báo "Tài khoản đã bị khóa. Liên hệ quản lý để mở lại."
+  "Tài khoản bị quản lý khóa thì không vào được."
+
+Bước 2. Tiếp nhận tạo phiếu - đăng nhập tiepnhan (1,5 phút)
+  - Chỉ vào Hộp việc: "Mỗi vai trò có hộp việc riêng, sắp theo mức gấp của thời hạn."
+  - Menu "Tạo phiếu tiếp nhận".
+  - Số điện thoại: 0912345678, bấm "Tìm khách". Thông tin khách điền sẵn.
+    "Tìm khách theo số điện thoại, không tra cứu khách chỉ bằng serial (BR-11)."
+  - "Thiết bị đã đăng ký của khách": chọn Dell Latitude 5420.
+  - Khách báo lỗi gì: Pin phồng, máy không sạc được.
+  - Tình trạng bên ngoài: Đáy máy hơi cong do pin phồng.
+  - Phụ kiện: chọn "Sạc / adapter".
+  - Ảnh hiện trạng: chọn ảnh đã chuẩn bị. "Ảnh được nén ngay trên trình duyệt trước khi lưu."
+  - Bấm "Tạo phiếu tiếp nhận". Hiện biên nhận có mã phiếu CAS-<ngày hôm nay>-0201.
+    Đọc to mã phiếu và ghi lại.
+  "Nút gửi bị khóa khi đang gửi và có khóa chống gửi trùng, bấm hai lần không tạo hai phiếu (EX-13)."
+
+Bước 3. CSKH kiểm tra sơ bộ - đăng nhập cskh (45 giây)
+  - Hộp việc, mở phiếu 0201 (hoặc "Danh sách phiếu", tìm theo số điện thoại 0912345678).
+  - Chỉ thanh tiến trình 8 bước ở đầu trang phiếu.
+  - Bấm "Kiểm tra sơ bộ". Hệ thống gợi ý "Còn hạn" dựa vào ngày mua và thời hạn bảo hành.
+    "Không có ngày mua thì hệ thống gợi ý 'Chưa đủ thông tin', không tự kết luận hết hạn (C05)."
+  - Bấm "Lưu kết quả".
+
+Bước 4. Điều phối giao chẩn đoán - đăng nhập dieuphoi (45 giây)
+  - Menu "Bảng điều phối": chỉ các thẻ tải việc của từng kỹ thuật viên (Bình thường / Quá tải).
+  - Mở phiếu 0201, bấm "Giao kỹ thuật viên chẩn đoán", chọn Nguyễn Văn An.
+    "Kỹ thuật viên quá 5 việc dở dang thì hệ thống cảnh báo quá tải. Đổi người thì phải ghi lý do."
+
+Bước 5. Kỹ thuật viên chẩn đoán - đăng nhập ktv.an (1,5 phút)
+  - Menu "Việc của tôi", mở phiếu 0201.
+  - Chỉ phần Khách hàng: "Kỹ thuật viên không thấy số điện thoại, email của khách."
+  - Bấm "Ghi biên bản chẩn đoán":
+      Phân loại nguyên nhân: Phần cứng. Mức độ: Trung bình.
+      Nguyên nhân lỗi: Pin chai, cell pin phồng.
+      Phương án sửa: Thay pin.
+      Công việc dự kiến: "Thay pin" 30 phút; "Kiểm tra sạc xả" 30 phút.
+      Linh kiện dự kiến: Pin Dell Latitude 54xx, số lượng 1.
+  - Bấm "Nộp biên bản".
+
+Bước 6. CSKH kết luận bảo hành - đăng nhập cskh (45 giây)
+  - Mở phiếu 0201, bấm "Kết luận bảo hành".
+  - Quy tắc gợi ý D1. Kết luận: Miễn phí. Lý do: Còn hạn, lỗi phần cứng thuộc phạm vi bảo hành.
+  - Lưu. Phiếu chuyển "chuẩn bị linh kiện", hệ thống tự lập lệnh sửa chữa WO-0041.
+  "Công việc và linh kiện chép từ biên bản chẩn đoán sang, điều phối không phải lập lại."
+  "Từ lúc này bắt đầu tính hạn 3 ngày làm việc, giờ làm 8:00-17:30, Thứ 2 đến Thứ 7, trừ ngày lễ."
+  Chỉ ô "Thời hạn xử lý" bên phải.
+
+Bước 7. Kho giữ linh kiện - đăng nhập kho (45 giây)
+  - Hộp việc, mục "Lệnh sửa chữa cần chuẩn bị linh kiện", mở phiếu 0201.
+  - Bấm "Giữ linh kiện khả dụng". Phiếu chuyển "Sẵn sàng sửa".
+  - Chỉ nút "Cấp phát cho kỹ thuật viên" đang bị khóa:
+    "Kho chỉ cấp phát khi lệnh đã có kỹ thuật viên, vì cấp phát là giao cho người cụ thể."
+
+Bước 8. Điều phối phân công sửa - đăng nhập dieuphoi (30 giây)
+  - Mở phiếu 0201, bấm "Phân công sửa chữa", chọn Nguyễn Văn An.
+
+Bước 9. Kho cấp phát - đăng nhập kho (20 giây)
+  - Mở phiếu 0201, bấm "Cấp phát cho kỹ thuật viên".
+
+Bước 10. Kỹ thuật viên sửa - đăng nhập ktv.an (1 phút)
+  - Mở phiếu 0201, bấm "Bắt đầu sửa".
+    "Chưa nhận đủ linh kiện thì nút này bị khóa (BR-13)."
+  - Đánh dấu xong 2 công việc. Ghi một dòng nhật ký: Đã thay pin, sạc lên 100%.
+  - Bấm "Hoàn tất, chuyển QC", số linh kiện đã dùng: 1, bấm "Chuyển QC".
+    "Dùng ít hơn số đã nhận thì phần dư chuyển 'chờ trả kho', kho xác nhận nhận lại (BR-16)."
+
+Bước 11. Kiểm tra chất lượng - đăng nhập qc (45 giây)
+  - Menu "Chờ kiểm tra chất lượng", mở phiếu 0201, bấm "Kiểm tra chất lượng".
+  - Đánh dấu đạt tất cả tiêu chí trong checklist laptop, bấm "Xác nhận đạt".
+  "Người kiểm tra phải khác người sửa. Checklist khác nhau theo loại máy: laptop, PC, máy in."
+
+Bước 12. Bàn giao - đăng nhập tiepnhan (1 phút)
+  - Menu "Chờ bàn giao", mở phiếu 0201, bấm "Bàn giao thiết bị".
+  - Người nhận: Nguyễn Thị Mai, chính chủ. Xác thực người nhận: Đối chiếu biên nhận gốc.
+  - Đánh dấu 3 mục đối chiếu (đủ phụ kiện, khách đã kiểm tra máy, đã ký biên bản).
+    Khách đánh giá: 5 sao. Bấm "Xác nhận bàn giao".
+  - Phiếu "Hoàn tất". Mở thẻ "Lịch sử":
+    "Mọi bước đều ghi ai làm, lúc nào. Không ai sửa được lịch sử (BR-28)."
+
+
+D. CÁC ĐIỂM NỔI BẬT (4-5 phút, chọn theo thời gian)
+---------------------------------------------------
+Dùng phiếu có sẵn trong dữ liệu mẫu. Nên làm D1 rồi D2 theo đúng thứ tự.
+
+D1. Quản lý phê duyệt - đăng nhập quanly (1 phút)
+  - Menu "Phê duyệt" có 2 đề nghị chờ duyệt:
+      Báo giá 5.300.000 đ vượt ngưỡng 2.000.000 đ (phiếu CAS-20261109-0063, thay mainboard).
+      Đề nghị mua 5 bàn phím HP ProBook 450 (do lệnh WO-0031 đang chờ hàng).
+  - Duyệt cả hai, ghi ghi chú ngắn.
+  "Báo giá trên 2 triệu phải qua quản lý trước khi gửi khách (BR-07). Mua linh kiện cũng cần quản lý duyệt (BR-17)."
+  - (Nếu còn thời gian) đăng nhập cskh, mở CAS-20261109-0063, bấm "Gửi báo giá đã duyệt cho khách".
+
+D2. Hàng về và tạm dừng thời hạn - đăng nhập kho (1,5 phút)
+  - Mở phiếu CAS-20261108-0055 (đang chờ linh kiện), chỉ ô "Thời hạn xử lý":
+    "Phiếu chờ linh kiện thì thời hạn tạm dừng, tối đa 3 ngày."
+  - Menu "Nhập kho và mua thêm". Linh kiện: LK-BP-HP450 Bàn phím HP ProBook 450. Số lượng: 5.
+    Chứng từ: PN-1125.
+  - Chỉ ô "Hàng về theo đề nghị mua đã duyệt (còn chờ 5)", để nguyên dấu chọn, bấm "Nhập kho".
+  - Trong danh sách bên dưới, đề nghị mua chuyển "Đã duyệt, đã nhận hàng".
+  - Menu "Yêu cầu linh kiện", mở WO-0031, bấm "Giữ linh kiện khả dụng".
+    Phiếu chuyển "Sẵn sàng sửa", khoảng tạm dừng kết thúc.
+  "Nếu kho còn hàng thì phải giữ, không được báo thiếu, để tránh dừng thời hạn và mua thừa."
+
+D3. QC không đạt - đăng nhập qc (1 phút)
+  - Mở phiếu CAS-20261107-0049 (đã sửa lại 1 lần), bấm "Kiểm tra chất lượng".
+  - Bỏ dấu một tiêu chí bắt buộc, ghi lỗi: Cổng sạc vẫn lỏng. Bấm "Không đạt, chuyển sửa lại".
+  "Khi kỹ thuật viên nhận xử lý lại, lỗi QC được thêm thành công việc 'Xử lý lại'. Sửa lại 2 lần mà vẫn không đạt
+   thì chuyển quản lý quyết định sửa tiếp hay trả máy (BR-22)."
+
+D4. Đổi phương án khi đang sửa (BR-12) - đăng nhập ktv.an (1 phút, chỉ giới thiệu)
+  - Mở phiếu CAS-20261106-0041 (đang sửa), bấm "Đề xuất đổi phương án", ghi lỗi mới, phương án mới,
+    bấm "Gửi đề xuất".
+  "CSKH xét đề xuất: trong phạm vi bảo hành thì áp dụng ngay, phát sinh phí thì lập báo giá bổ sung
+   và tạm dừng hạn chờ khách xác nhận. Trong lúc chờ, kỹ thuật viên không hoàn tất được."
+
+D5. Quản trị - đăng nhập quanly (30 giây)
+  - "Tài khoản và phân quyền": khóa hoặc mở tài khoản, đặt lại mật khẩu.
+  - "Lịch làm việc": thêm ngày nghỉ lễ thì hạn của mọi phiếu đang mở được tính lại ngay.
+  - "Nhật ký thao tác": mọi thao tác quan trọng đều được ghi.
+
+
+E. KẾT THÚC (30 giây)
+---------------------
+
+"Những chỗ tài liệu chưa nói rõ, em tự suy luận và ghi trong SUY_LUAN.txt, mỗi mục có ghi người cần
+xác nhận. Nhờ các bạn xem giúp các mục liên quan đến phần mình. Khi TV4 có Swagger, em sẽ thay lớp
+dịch vụ giả bằng API thật."
+
+
+F. BẢN RÚT GỌN (khoảng 7 phút)
+------------------------------
+
+  1. Mở đầu (30 giây).
+  2. Bước 1 và Bước 2 của mục C: tài khoản bị khóa, tạo phiếu (2 phút).
+  3. D1: quản lý duyệt báo giá và đề nghị mua (1 phút).
+  4. D2: kho nhập hàng, giữ linh kiện cho WO-0031 (1,5 phút).
+  5. D3: QC không đạt (1 phút).
+  6. Bàn giao phiếu có sẵn - đăng nhập tiepnhan, menu "Chờ bàn giao", phiếu CAS-20261105-0032,
+     làm như Bước 12 với người nhận Lý Gia Bảo (1 phút).
+
+
+G. CÂU HỎI CÓ THỂ GẶP VÀ GỢI Ý TRẢ LỜI
+---------------------------------------
+
+Hỏi: Chưa có backend thì dữ liệu ở đâu?
+  Lưu trong localStorage của trình duyệt (src/mock). Lớp src/api/service.ts mỗi hàm tương ứng một API,
+  có kiểm tra quyền và quy tắc như backend. Khi có API thật chỉ thay thân hàm.
+
+Hỏi: Phân quyền kiểm ở đâu, chỉ ẩn nút thôi à?
+  Hai lớp: giao diện ẩn menu, ẩn nút và chặn trang không đúng vai trò; lớp dịch vụ kiểm tra lại vai trò
+  ở mọi thao tác, giống backend sẽ làm. Gọi thẳng hàm mà sai vai trò vẫn bị từ chối.
+
+Hỏi: Thời hạn xử lý tính thế nào?
+  3 ngày làm việc (3 x 9,5 giờ) từ lúc lập lệnh sửa chữa. Giờ làm 8:00-17:30, Thứ 2 đến Thứ 7, trừ ngày lễ.
+  Chờ linh kiện (tối đa 3 ngày) và chờ khách xác nhận giá (tối đa 5 ngày) được tạm dừng. Hai khoảng
+  tạm dừng chồng nhau thì phần chồng chỉ trừ một lần. Tạm dừng bắt đầu sau khi đã quá hạn thì không dời hạn.
+
+Hỏi: Hai người cùng thao tác trên một phiếu thì sao?
+  Mỗi phiếu có số phiên bản. Ghi với phiên bản cũ thì báo "Phiếu vừa được người khác cập nhật" kèm nút
+  Tải lại (giả lập mã 409, EX-14). Trong bản chạy thử, các tab cùng trình duyệt còn tự cập nhật ngay khi
+  tab khác ghi dữ liệu.
+
+Hỏi: Thiếu linh kiện thì xử lý thế nào?
+  Kho bấm "Báo thiếu linh kiện": hệ thống chỉ đề nghị mua phần không có sẵn và chưa có đề nghị đang chờ,
+  gửi quản lý duyệt, phiếu tạm dừng thời hạn. Hàng về thì kho nhập kho, ghi nhận cho đề nghị mua đã duyệt,
+  rồi giữ cho lệnh. Dừng sửa giữa chừng thì đề nghị mua chưa duyệt của lệnh đó tự hủy.
+
+Hỏi: Người sửa tự kiểm tra chất lượng được không?
+  Không. Hệ thống chặn, người kiểm tra phải khác người sửa.
+
+Hỏi: Có chạy trên máy tính bảng, có chế độ tối không?
+  Ưu tiên máy tính, co giãn được trên máy tính bảng. Có chế độ sáng, tối theo hệ thống.
+
+Hỏi: Những chỗ nào là tự suy luận?
+  Ghi trong Thuc/frontend/SUY_LUAN.txt, mỗi mục có căn cứ và người cần xác nhận (TV2, TV4, TV5...).
+
+
+H. NẾU GẶP SỰ CỐ KHI DEMO
+-------------------------
+
+  - Dữ liệu lộn xộn hoặc mã phiếu không khớp kịch bản: đăng xuất, bấm "Khôi phục dữ liệu mẫu".
+  - Trang trắng hoặc báo lỗi: nhấn F5. Vẫn lỗi thì dừng terminal (Ctrl+C) và chạy lại npm run dev.
+  - Báo "Phiếu vừa được người khác cập nhật": bấm "Tải lại" trên thông báo rồi làm lại.
+  - Báo hết dung lượng khi chọn ảnh: dùng ảnh nhỏ hơn, hoặc khôi phục dữ liệu mẫu.
+  - Quên mật khẩu: xem DEMO_PASSWORD trong src/mock/seed.ts.
+  - npm run dev báo lỗi phiên bản Node: cài Node 22 LTS rồi chạy lại.

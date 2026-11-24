@@ -55,7 +55,7 @@ function Inner() {
           </NativeSelect>
         </label>
       </div>
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         {rows.length === 0 ? (
           <Empty>Chưa có thao tác nào khớp bộ lọc. Nhật ký bắt đầu ghi từ khi khôi phục dữ liệu mẫu.</Empty>
         ) : (

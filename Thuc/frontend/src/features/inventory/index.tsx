@@ -26,7 +26,7 @@ function Inner() {
         Tìm linh kiện
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder='Mã, tên hoặc model phù hợp' />
       </label>
-      <div className='overflow-x-auto rounded-lg border'>
+      <div className='bg-card overflow-x-auto rounded-lg border'>
         {rows.length === 0 ? (
           <Empty>Không tìm thấy linh kiện.</Empty>
         ) : (

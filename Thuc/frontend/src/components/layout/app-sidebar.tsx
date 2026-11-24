@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { BrandMark } from '@/components/brand-mark'
 import { APP, NAV } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import { useNavCounts } from './nav-counts'
@@ -34,11 +35,11 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size='lg' className='pointer-events-none'>
               <div className='bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg'>
-                <APP.icon className='size-4' />
+                <BrandMark className='size-5' />
               </div>
               <div className='grid flex-1 text-start text-sm leading-tight'>
-                <span className='truncate font-semibold'>{APP.name}</span>
-                <span className='truncate text-xs'>{APP.subtitle}</span>
+                <span className='truncate font-semibold tracking-wide text-white'>{APP.name}</span>
+                <span className='text-sidebar-foreground/80 truncate text-xs'>{APP.subtitle}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

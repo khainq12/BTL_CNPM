@@ -85,3 +85,24 @@
     height: 0;
   }
 }
+
+/* Trang đăng nhập: đường ray hành trình phiếu hiện dần, mỗi bước sáng lên theo thứ tự (tắt khi người dùng giảm chuyển động). */
+@keyframes woms-track {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes woms-dot {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

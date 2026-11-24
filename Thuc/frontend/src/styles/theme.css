@@ -1,63 +1,81 @@
+/* Màu nhận diện WOMS: mực xưởng (khung, menu) và xanh ngọc dịch vụ (thao tác chính).
+   Màu trạng thái (xanh lá, vàng, cam, đỏ) giữ riêng trong components/woms.tsx, không dùng làm màu trang trí. */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
+  --background: #f5f7f8;
+  --foreground: #13212e;
+  --card: #ffffff;
+  --card-foreground: #13212e;
+  --popover: #ffffff;
+  --popover-foreground: #13212e;
+  --primary: #0f766e;
+  --primary-foreground: #f2fbfa;
+  --secondary: #edf1f3;
+  --secondary-foreground: #13212e;
+  --muted: #edf1f3;
+  --muted-foreground: #586977;
+  --accent: #e2f1ef;
+  --accent-foreground: #0b4f4a;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --border: #dbe3e7;
+  --input: #ccd7dc;
+  --ring: #0f766e;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
 
-  --sidebar: var(--background);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--accent);
-  --sidebar-accent-foreground: var(--accent-foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+  --sidebar: #13212e;
+  --sidebar-foreground: #c6d2da;
+  --sidebar-primary: #2bb3a5;
+  --sidebar-primary-foreground: #06211e;
+  --sidebar-accent: #1f3343;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #24384a;
+  --sidebar-ring: #2bb3a5;
+
+  /* Thước thời hạn: phần nền là bậc nhạt của cùng màu phần đã dùng. */
+  --meter-ok: #0f766e;
+  --meter-ok-track: #d3ebe8;
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.14 0.04 259.21);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
+  --background: #0e1821;
+  --foreground: #e4ebf0;
+  --card: #14212c;
+  --card-foreground: #e4ebf0;
+  --popover: #14212c;
+  --popover-foreground: #e4ebf0;
+  --primary: #2bb3a5;
+  --primary-foreground: #04201d;
+  --secondary: #1c2b37;
+  --secondary-foreground: #e4ebf0;
+  --muted: #1c2b37;
+  --muted-foreground: #94a5b2;
+  --accent: #143a37;
+  --accent-foreground: #cdf2ec;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+  --border: rgb(255 255 255 / 9%);
+  --input: rgb(255 255 255 / 15%);
+  --ring: #2bb3a5;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+
+  --sidebar: #0a121a;
+  --sidebar-foreground: #b5c4ce;
+  --sidebar-primary: #2bb3a5;
+  --sidebar-primary-foreground: #04201d;
+  --sidebar-accent: #172634;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1a2a37;
+  --sidebar-ring: #2bb3a5;
+
+  --meter-ok: #2bb3a5;
+  --meter-ok-track: #173d3a;
 }
 
 @theme inline {
@@ -99,4 +117,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-meter-ok: var(--meter-ok);
+  --color-meter-ok-track: var(--meter-ok-track);
 }

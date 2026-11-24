@@ -1,12 +1,14 @@
 import { Link } from '@tanstack/react-router'
-import { ShieldX } from 'lucide-react'
+import { AlarmClock, CirclePause, Clock, ClockAlert, Laptop, PcCase, Printer, ShieldX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDb, useMe } from '@/api/hooks'
 import { canSee, type PageKey } from '@/domain/roles'
-import { slaInfo, type SlaKind } from '@/domain/sla'
+import { slaInfo, slaLeftMinutes, type SlaKind } from '@/domain/sla'
+import { PARAMS, WORK_DAY_MINUTES } from '@/domain/params'
+import { DEVICE_KIND_LABEL } from '@/domain/rules'
 import { CASE_STATUS, type Tone } from '@/domain/statuses'
-import type { CaseStatus, WarrantyCase } from '@/domain/types'
-import { fmtDateTime } from '@/domain/format'
+import type { CaseStatus, DeviceKind, WarrantyCase } from '@/domain/types'
+import { fmtDateTime, initials } from '@/domain/format'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -25,7 +27,7 @@ const TONE: Record<Tone, string> = {
 
 export function Pill({ tone = 'neutral', className, children }: { tone?: Tone; className?: string; children: React.ReactNode }) {
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap', TONE[tone], className)}>
+    <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap', TONE[tone], className)}>
       {children}
     </span>
   )
@@ -33,7 +35,12 @@ export function Pill({ tone = 'neutral', className, children }: { tone?: Tone; c
 
 export function StatusBadge({ status }: { status: CaseStatus }) {
   const s = CASE_STATUS[status]
-  return <Pill tone={s.tone}>{s.label}</Pill>
+  return (
+    <Pill tone={s.tone}>
+      <span className='size-1.5 shrink-0 rounded-full bg-current opacity-70' aria-hidden />
+      {s.label}
+    </Pill>
+  )
 }
 
 const SLA_TONE: Record<SlaKind, Tone> = {
@@ -176,5 +183,92 @@ export function Section({ title, description, actions, children, className }: { 
       </header>
       <div className='p-4'>{children}</div>
     </section>
+  )
+}
+
+// Biểu tượng loại thiết bị, đi kèm tên thiết bị (không thay cho chữ).
+const DEVICE_ICON = { laptop: Laptop, pc: PcCase, printer: Printer } satisfies Record<DeviceKind, unknown>
+
+export function DeviceIcon({ kind, className }: { kind: DeviceKind; className?: string }) {
+  const Icon = DEVICE_ICON[kind]
+  return (
+    <span className={cn('bg-accent text-accent-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-md', className)} title={DEVICE_KIND_LABEL[kind]}>
+      <Icon className='size-4' aria-hidden />
+      <span className='sr-only'>{DEVICE_KIND_LABEL[kind]}</span>
+    </span>
+  )
+}
+
+// Ảnh đại diện bằng chữ cái đầu. Màu theo thứ tự tài khoản (cố định), chỉ để dễ nhận ra; tên luôn hiện bên cạnh.
+const AVATAR_TONES = [
+  'bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-200',
+  'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200',
+  'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200',
+  'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
+  'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200',
+  'bg-lime-100 text-lime-900 dark:bg-lime-950 dark:text-lime-200',
+]
+
+export function UserAvatar({ id, className }: { id?: string; className?: string }) {
+  const db = useDb()
+  const i = db.users.findIndex((u) => u.id === id)
+  if (i < 0) return null
+  return (
+    <span className={cn('inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold', AVATAR_TONES[i % AVATAR_TONES.length], className)} aria-hidden>
+      {initials(db.users[i].name)}
+    </span>
+  )
+}
+
+export function UserChip({ id }: { id?: string }) {
+  const name = useName()
+  if (!id) return <span className='text-muted-foreground'>—</span>
+  return (
+    <span className='inline-flex items-center gap-2 whitespace-nowrap'>
+      <UserAvatar id={id} />
+      {name(id)}
+    </span>
+  )
+}
+
+// Thước thời hạn: phần còn lại của quỹ 3 ngày làm việc. Màu theo mức gấp, luôn kèm biểu tượng và chữ.
+const SLA_BUDGET = PARAMS.repairSlaDays * WORK_DAY_MINUTES
+const METER = {
+  ok: { icon: Clock, fill: 'bg-meter-ok', track: 'bg-meter-ok-track', text: 'text-foreground' },
+  soon: { icon: AlarmClock, fill: 'bg-amber-500', track: 'bg-amber-100 dark:bg-amber-950', text: 'text-amber-800 dark:text-amber-300' },
+  overdue: { icon: ClockAlert, fill: 'bg-red-600 dark:bg-red-500', track: 'bg-red-100 dark:bg-red-950', text: 'text-red-700 dark:text-red-300' },
+  paused: { icon: CirclePause, fill: 'bg-slate-400 dark:bg-slate-500', track: 'bg-muted', text: 'text-muted-foreground' },
+} as const
+
+const hours = (m: number) => (m / 60).toLocaleString('vi-VN', { maximumFractionDigits: 1 })
+
+export function SlaMeter({ c }: { c: WarrantyCase }) {
+  const s = slaInfo(c)
+  if (s.kind !== 'ok' && s.kind !== 'soon' && s.kind !== 'overdue' && s.kind !== 'paused') return <SlaBadge c={c} />
+  const m = METER[s.kind]
+  const left = s.kind === 'overdue' ? 0 : Math.max(0, slaLeftMinutes(c) ?? 0)
+  const pct = s.kind === 'overdue' ? 100 : Math.max(2, Math.min(100, (left / SLA_BUDGET) * 100))
+  return (
+    <div className='grid gap-1.5'>
+      <div className={cn('flex items-center gap-1.5 text-sm font-medium', m.text)}>
+        <m.icon className='size-4' aria-hidden />
+        {s.label}
+        {s.kind !== 'overdue' && <span className='text-muted-foreground ms-auto text-xs font-normal tabular-nums'>{hours(left)} / {hours(SLA_BUDGET)} giờ</span>}
+      </div>
+      <div
+        role='meter'
+        aria-label='Thời gian xử lý còn lại'
+        aria-valuemin={0}
+        aria-valuemax={SLA_BUDGET}
+        aria-valuenow={Math.round(left)}
+        aria-valuetext={s.label}
+        className={cn('h-2 overflow-hidden rounded-full', m.track)}
+      >
+        <div
+          className={cn('h-full rounded-full', m.fill, s.kind === 'paused' && 'bg-[repeating-linear-gradient(135deg,transparent_0_4px,rgb(255_255_255/0.45)_4px_7px)]')}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   )
 }

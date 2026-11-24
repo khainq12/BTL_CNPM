@@ -22,7 +22,7 @@ function Inner() {
   return (
     <PageShell title='Yêu cầu linh kiện' description='Giữ linh kiện khả dụng cho lệnh mới, báo thiếu nếu hết hàng, cấp phát khi kỹ thuật viên nhận, xác nhận nhận lại phần chưa dùng.'>
       {rows.length === 0 ? (
-        <Empty className='rounded-lg border'>Không có yêu cầu linh kiện nào cần xử lý.</Empty>
+        <Empty className='bg-card rounded-lg border'>Không có yêu cầu linh kiện nào cần xử lý.</Empty>
       ) : (
         rows.map(({ w, c }) => (
           <Section

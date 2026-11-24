@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { PARAMS } from '@/domain/params'
 import { availableQty, missingQty, purchaseOpenQty, toOrderQty } from '@/domain/parts'
 import { currentPlan, openChange } from '@/domain/plan-change'
+import { QC_CHECKLIST } from '@/domain/rules'
 import { openPause } from '@/domain/sla'
 import { CASE_STATUS } from '@/domain/statuses'
 import type {
@@ -9,6 +10,7 @@ import type {
   ApprovalType,
   AuditEntry,
   CaseStatus,
+  Device,
   Diagnosis,
   EligibilityDecision,
   Handover,
@@ -144,25 +146,68 @@ export type IntakeInput = {
   photos: Photo[]
 }
 
+// Bỏ khoảng trắng hai đầu và ký tự vô hình (zero-width), để chuỗi "trông trống" bị coi là trống.
+const clean = (s: string) => s.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim()
+
+// Chỉ lộ 3 số cuối điện thoại chủ thiết bị: serial không được dùng để xem thông tin khách khác.
+export function serialOwnedMessage(db: Pick<Db, 'customers'>, device: Device) {
+  const owner = db.customers.find((x) => x.id === device.customerId)
+  return `Serial ${device.serial} đã đăng ký cho khách khác${owner && owner.phone.length >= 7 ? ` (số điện thoại đuôi ${owner.phone.slice(-3)})` : ''}. Kiểm tra lại serial, hoặc tạo phiếu theo số điện thoại của chủ thiết bị.`
+}
+
+// Phần chung của biên nhận tại quầy và nhận máy online (BR-02): ảnh, tình trạng, phụ kiện. Trả về dữ liệu đã làm sạch.
+function intakeReceipt(d: { condition: string; accessories: string[]; noAccessories: boolean; photos: Photo[] }) {
+  if (!d.photos?.length) throw new ApiError(422, 'Cần ít nhất 1 ảnh hiện trạng.')
+  const condition = clean(d.condition ?? '')
+  if (!condition) throw new ApiError(422, 'Mô tả tình trạng bên ngoài, ghi "Nguyên vẹn" nếu không có vết.')
+  const accessories = d.noAccessories ? [] : (d.accessories ?? []).map(clean).filter(Boolean)
+  if (!d.noAccessories && !accessories.length) throw new ApiError(422, 'Chọn phụ kiện hoặc "Không có phụ kiện".')
+  return { condition, accessories, noAccessories: !!d.noAccessories, photos: d.photos }
+}
+
 export async function createCase(user: User, input: IntakeInput, idempotencyKey: string) {
   need(user, ['TN'])
   await wait(700)
   const db = structuredClone(loadDb())
-  const done = db.idempotency[idempotencyKey]
-  if (done) return db.cases.find((c) => c.id === done)! // EX-13: gửi lại cùng khóa không tạo phiếu thứ hai
-  if (!input.photos.length) throw new ApiError(422, 'Cần ít nhất 1 ảnh hiện trạng.')
+  // EX-13: gửi lại cùng khóa không tạo phiếu thứ hai. Khóa rỗng không được dùng (sẽ trả nhầm phiếu cũ).
+  const key = clean(idempotencyKey ?? '')
+  if (!key) throw new ApiError(422, 'Thiếu mã chống gửi trùng. Tải lại trang rồi thử lại.')
+  const done = Object.hasOwn(db.idempotency, key) ? db.idempotency[key] : undefined
+  if (done) return db.cases.find((c) => c.id === done)!
+  const receipt = intakeReceipt(input)
+  // QA-DEF-001, 002 và các trường bắt buộc khác: kiểm lại ở service, không chỉ dựa vào form (BR-02, BR-27).
+  const serial = clean(input.device.serial).toUpperCase()
+  if (!serial) throw new ApiError(422, 'Nhập serial in trên tem thiết bị.')
+  const symptom = clean(input.symptom)
+  if (!symptom) throw new ApiError(422, 'Nhập lỗi khách mô tả.')
+  const name = clean(input.customer.name ?? '')
+  if (!name) throw new ApiError(422, 'Nhập họ tên khách.')
+  const phone = clean(input.customer.phone ?? '')
+  if (!/^0\d{9}$/.test(phone)) throw new ApiError(422, 'Số điện thoại gồm 10 chữ số, bắt đầu bằng 0.')
+  const email = clean(input.customer.email ?? '')
+  if (email && !/^\S+@\S+\.\S+$/.test(email)) throw new ApiError(422, 'Email chưa đúng định dạng.')
+  if (!['laptop', 'pc', 'printer'].includes(input.device.kind)) throw new ApiError(422, 'Chọn loại thiết bị.')
+  const brand = clean(input.device.brand ?? '')
+  const model = clean(input.device.model ?? '')
+  if (!brand || !model) throw new ApiError(422, 'Nhập hãng và model thiết bị.')
 
-  let customer = db.customers.find((x) => x.id === input.customerId || x.phone === input.customer.phone)
+  // Khách: có id thì id phải khớp SĐT gửi lên (tránh ghi đè hồ sơ khách khác); không có id thì tìm theo SĐT.
+  const byCustomerId = input.customerId ? db.customers.find((x) => x.id === input.customerId) : undefined
+  if (byCustomerId && byCustomerId.phone !== phone) throw new ApiError(422, 'Số điện thoại không khớp với khách đã chọn. Tìm lại khách theo số điện thoại.')
+  let customer = byCustomerId ?? db.customers.find((x) => x.phone === phone)
+  const byId = input.deviceId ? db.devices.find((x) => x.id === input.deviceId) : undefined
+  if (byId && byId.serial.toUpperCase() !== serial) throw new ApiError(422, 'Serial không khớp với thiết bị đã chọn. Chọn lại thiết bị hoặc nhập lại serial.')
+  let device = byId ?? db.devices.find((x) => x.serial.toUpperCase() === serial)
+  // QA-DEF-003: serial đã đăng ký cho khách khác thì chặn, không tạo phiếu lệch chủ sở hữu.
+  if (device && device.customerId !== customer?.id) throw new ApiError(422, serialOwnedMessage(db, device))
   if (!customer) {
-    customer = { id: uid('c'), ...input.customer }
+    customer = { id: uid('c'), name, phone, email: email || undefined }
     db.customers.push(customer)
   } else {
-    Object.assign(customer, { name: input.customer.name, email: input.customer.email || customer.email })
+    Object.assign(customer, { name, email: email || customer.email })
   }
-  const serial = input.device.serial.trim().toUpperCase()
-  let device = db.devices.find((x) => x.id === input.deviceId || x.serial.toUpperCase() === serial)
   if (!device) {
-    device = { id: uid('d'), customerId: customer.id, ...input.device, serial, warrantyMonths: PARAMS.defaultWarrantyMonths, policyCode: 'BH-TC-2026' }
+    device = { id: uid('d'), customerId: customer.id, ...input.device, brand, model, serial, warrantyMonths: PARAMS.defaultWarrantyMonths, policyCode: 'BH-TC-2026' }
     db.devices.push(device)
   }
   db.counters.case += 1
@@ -175,11 +220,8 @@ export async function createCase(user: User, input: IntakeInput, idempotencyKey:
     customerId: customer.id,
     deviceId: device.id,
     channel: 'QUAY',
-    symptom: input.symptom,
-    condition: input.condition,
-    accessories: input.accessories,
-    noAccessories: input.noAccessories,
-    photos: input.photos,
+    symptom,
+    ...receipt,
     createdAt: t,
     receivedAt: t,
     receivedBy: user.id,
@@ -190,7 +232,7 @@ export async function createCase(user: User, input: IntakeInput, idempotencyKey:
     events: [{ at: t, by: user.id, action: 'Tạo phiếu tiếp nhận', to: 'RECEIVED' }],
   }
   db.cases.unshift(c)
-  db.idempotency[idempotencyKey] = c.id
+  db.idempotency[key] = c.id
   audit(db, user.id, 'PHIEU', c.code, 'Tạo phiếu tiếp nhận (CaseCreated)')
   saveDb(db)
   return c
@@ -200,7 +242,7 @@ export function acceptOnline(user: User, id: string, v: number, d: { condition: 
   need(user, ['TN'])
   return onCase(user, id, v, 'Nhận máy, lập biên nhận', (c) => {
     expectStatus(c, 'PENDING_ACCEPT')
-    Object.assign(c, d, { receivedAt: now(), receivedBy: user.id })
+    Object.assign(c, intakeReceipt(d), { receivedAt: now(), receivedBy: user.id })
     return { to: 'RECEIVED' }
   })
 }
@@ -319,6 +361,28 @@ function createWorkOrder(db: Db, user: User, c: WarrantyCase) {
 
 export type QuoteInput = { items: Quote['items']; labor: number }
 
+// Báo giá hợp lệ (BR-07): không cho số âm, số lượng lẻ hay tổng 0 để lách ngưỡng quản lý duyệt. Trả về báo giá đã làm sạch.
+function validateQuote(q: QuoteInput | undefined, what = 'Báo giá') {
+  if (!q || !Array.isArray(q.items)) throw new ApiError(422, `${what} chưa có hạng mục.`)
+  const items = q.items.map((i) => ({ ...i, label: clean(String(i.label ?? '')) }))
+  if (items.some((i) => !i.label)) throw new ApiError(422, `Hạng mục ${what.toLowerCase()} không được để trống tên (xóa dòng thừa nếu không dùng).`)
+  if (items.some((i) => !Number.isSafeInteger(i.qty) || i.qty < 1)) throw new ApiError(422, 'Số lượng mỗi hạng mục phải là số nguyên từ 1 trở lên.')
+  if (items.some((i) => !Number.isFinite(i.unitPrice) || i.unitPrice < 0)) throw new ApiError(422, 'Đơn giá không được âm.')
+  if (!Number.isFinite(q.labor) || q.labor < 0) throw new ApiError(422, 'Tiền công không được âm.')
+  if (items.length + (q.labor > 0 ? 1 : 0) === 0) throw new ApiError(422, `${what} chưa có hạng mục.`)
+  const total = items.reduce((s, i) => s + i.qty * i.unitPrice, 0) + q.labor
+  if (!Number.isFinite(total) || total <= 0) throw new ApiError(422, `Tổng ${what.toLowerCase()} phải lớn hơn 0.`)
+  return { items, labor: q.labor, total }
+}
+
+// Kết luận được phép, khớp với lựa chọn trên giao diện (Eligibility trong actions.tsx).
+export function allowedDecisions(repairable: boolean, exceptionApproved?: boolean): EligibilityDecision[] {
+  if (!repairable) return ['KHONG_SUA']
+  if (exceptionApproved === false) return ['CO_PHI', 'KHONG_SUA']
+  if (exceptionApproved === true) return ['MIEN_PHI', 'CO_PHI', 'KHONG_SUA']
+  return ['MIEN_PHI', 'CO_PHI', 'NGOAI_LE', 'KHONG_SUA']
+}
+
 export function decideEligibility(
   user: User,
   id: string,
@@ -331,11 +395,13 @@ export function decideEligibility(
     if (!c.diagnosis) throw new ApiError(422, 'Chưa có biên bản chẩn đoán. Không kết luận bảo hành khi chưa rõ nguyên nhân lỗi (C03).')
     if (!d.reason.trim()) throw new ApiError(422, 'Ghi lý do kết luận (BR-05).')
     const exceptionApproved = c.eligibility?.exceptionApproved
+    // DEF-PRE-02: chỉ nhận kết luận mà giao diện cho phép (máy không sửa được thì chỉ "không sửa").
+    if (!allowedDecisions(c.diagnosis.repairable, exceptionApproved).includes(d.decision))
+      throw new ApiError(422, c.diagnosis.repairable ? 'Kết luận này không áp dụng được sau kết quả xét ngoại lệ của quản lý.' : 'Kỹ thuật viên kết luận không sửa được (D10): chỉ chọn "Không sửa, trả thiết bị".')
     c.eligibility = { decision: d.decision, ruleCode: d.ruleCode, reason: d.reason, policyCode: 'BH-TC-2026', exceptionApproved, by: user.id, at: now() }
     const note = `${d.ruleCode}: ${d.reason}`
     switch (d.decision) {
       case 'MIEN_PHI':
-        if (!c.diagnosis.repairable) throw new ApiError(422, 'Kỹ thuật viên kết luận không sửa được (D10).')
         return { to: createWorkOrder(db, user, c), note }
       case 'KHONG_SUA':
         return { to: 'RETURN_PENDING', note }
@@ -345,10 +411,9 @@ export function decideEligibility(
         return { to: 'WAITING_APPROVAL', note }
       }
       case 'CO_PHI': {
-        if (!d.quote || d.quote.items.length + (d.quote.labor > 0 ? 1 : 0) === 0) throw new ApiError(422, 'Báo giá chưa có hạng mục.')
-        const total = d.quote.items.reduce((s, i) => s + i.qty * i.unitPrice, 0) + d.quote.labor
+        const { items, labor, total } = validateQuote(d.quote)
         const over = total > PARAMS.quoteApprovalThreshold
-        const q: Quote = { version: c.quotes.length + 1, ...d.quote, total, status: over ? 'CHO_DUYET' : 'DA_GUI', createdBy: user.id, createdAt: now(), sentAt: over ? undefined : now() }
+        const q: Quote = { version: c.quotes.length + 1, items, labor, total, status: over ? 'CHO_DUYET' : 'DA_GUI', createdBy: user.id, createdAt: now(), sentAt: over ? undefined : now() }
         c.quotes.push(q)
         if (over) {
           const ap = newApproval(db, user, 'BAO_GIA', { caseId: c.id, title: `Báo giá ${total.toLocaleString('vi-VN')} đ vượt ngưỡng ${PARAMS.quoteApprovalThreshold.toLocaleString('vi-VN')} đ`, detail: `${c.code}. ${d.reason}` })
@@ -630,11 +695,13 @@ export function finishRepair(user: User, id: string, v: number, used: Record<str
     if (openChange(c)) throw new ApiError(422, 'Đang chờ xác nhận đổi phương án (BR-12).')
     if (w.tasks.some((t) => !t.done)) throw new ApiError(422, 'Còn công việc chưa hoàn thành (BR-19).')
     if (w.parts.some((p) => p.issued < p.qty)) throw new ApiError(422, 'Chưa nhận đủ linh kiện của phương án hiện hành từ kho.')
+    // DEF-PRE-01: chỉ tính phần đã nhận mà chưa dùng, chưa trả và chưa chờ trả (đúng cả ở vòng sửa lại).
     for (const p of w.parts) {
-      const u = used[p.partId] ?? p.issued
-      if (u < 0 || u > p.issued - p.used) throw new ApiError(422, 'Số linh kiện đã dùng không hợp lệ.')
+      const remaining = p.issued - p.used - p.returned - p.returnPending
+      const u = used[p.partId] ?? remaining
+      if (!Number.isInteger(u) || u < 0 || u > remaining) throw new ApiError(422, 'Số linh kiện đã dùng không hợp lệ.')
       p.used += u
-      p.returnPending += p.issued - p.used - p.returned - p.returnPending
+      p.returnPending += remaining - u
     }
     w.finishedAt = now()
     if (note.trim()) w.logs.push({ at: now(), by: user.id, text: note })
@@ -714,6 +781,7 @@ export function reviewPlanChange(
   d: { result: 'MIEN_PHI' | 'CO_PHI' | 'KHONG_DONG_Y'; note: string; quote?: QuoteInput }
 ) {
   need(user, ['CSKH'])
+  if (!['MIEN_PHI', 'CO_PHI', 'KHONG_DONG_Y'].includes(d.result)) throw new ApiError(422, 'Kết quả xét đổi phương án không hợp lệ.')
   const action = {
     MIEN_PHI: 'Chấp nhận đổi phương án, không phát sinh phí',
     CO_PHI: 'Lập báo giá bổ sung cho phương án mới',
@@ -734,13 +802,13 @@ export function reviewPlanChange(
       ch.outcome = 'Áp dụng, trong phạm vi bảo hành'
       return { note: `#${ch.no}: ${d.note}` }
     }
-    if (!d.quote || d.quote.items.length + (d.quote.labor > 0 ? 1 : 0) === 0) throw new ApiError(422, 'Báo giá bổ sung chưa có hạng mục.')
-    const total = d.quote.items.reduce((s, i) => s + i.qty * i.unitPrice, 0) + d.quote.labor
+    const { items, labor, total } = validateQuote(d.quote, 'Báo giá bổ sung')
     const over = total > PARAMS.quoteApprovalThreshold
     const q: Quote = {
       version: c.quotes.length + 1,
       planChangeNo: ch.no,
-      ...d.quote,
+      items,
+      labor,
       total,
       status: over ? 'CHO_DUYET' : 'DA_GUI',
       createdBy: user.id,
@@ -819,9 +887,18 @@ export function submitQc(user: User, id: string, v: number, items: QcItem[], def
     expectStatus(c, 'TESTING')
     const w = findWo(db, c.workOrderId)
     if (w.technicianId === user.id) throw new ApiError(403, 'Người kiểm tra phải khác người sửa.')
-    const pass = items.every((i) => !i.mandatory || i.pass)
+    // QA-DEF-004 (BR-20): phải kiểm đủ các mục bắt buộc theo loại thiết bị; "bắt buộc" lấy từ danh mục, không tin dữ liệu gửi lên.
+    const kind = db.devices.find((x) => x.id === c.deviceId)?.kind
+    const required = kind ? QC_CHECKLIST[kind].filter((i) => i.mandatory) : []
+    if (!items.length || !required.length) throw new ApiError(422, 'Chưa có kết quả kiểm tra. Kiểm theo danh mục của loại thiết bị.')
+    if (new Set(items.map((i) => i.label)).size !== items.length) throw new ApiError(422, 'Danh sách kiểm tra có mục bị trùng. Tải lại và kiểm lại.')
+    const missing = required.filter((r) => !items.some((i) => i.label === r.label))
+    if (missing.length) throw new ApiError(422, `Chưa kiểm mục bắt buộc: ${missing.map((r) => r.label).join(', ')}.`)
+    const pass = required.every((r) => items.some((i) => i.label === r.label && i.pass))
     if (!pass && !defect.trim()) throw new ApiError(422, 'Kết quả không đạt phải mô tả lỗi còn tồn tại.')
-    c.qc.push({ round: c.qc.length + 1, items, pass, defect: pass ? undefined : defect, photos: photos.length ? photos : undefined, by: user.id, at: now() })
+    // Lưu cờ "bắt buộc" theo danh mục, không theo dữ liệu gửi lên.
+    const saved = items.map((i) => ({ ...i, mandatory: required.some((r) => r.label === i.label) }))
+    c.qc.push({ round: c.qc.length + 1, items: saved, pass, defect: pass ? undefined : defect, photos: photos.length ? photos : undefined, by: user.id, at: now() })
     if (pass) {
       c.readyAt = now()
       return { to: 'READY_FOR_DELIVERY', note: `Đạt lần ${c.qc.length}` }
@@ -845,8 +922,15 @@ export function handover(user: User, id: string, v: number, d: Omit<Handover, 'b
     const withoutRepair = !!c.returnConclusion && !c.qc.some((q) => q.pass)
     if (!withoutRepair && !c.qc.at(-1)?.pass) throw new ApiError(422, 'Kết quả kiểm tra chất lượng mới nhất chưa đạt (BR-23).')
     if (!d.accessoriesOk || !d.conditionOk || !d.signed) throw new ApiError(422, 'Cần đối chiếu phụ kiện, tình trạng và có xác nhận của người nhận (BR-24).')
-    c.handover = { ...d, withoutRepair, by: user.id, at: now() }
-    return { to: 'COMPLETED', note: `Người nhận: ${d.recipientName} (${d.relation === 'CHINH_CHU' ? 'chính chủ' : 'nhận hộ'})` }
+    // DEF-PRE-05: kiểm đúng các mục bắt buộc của form bàn giao (SĐT người nhận không bắt buộc).
+    const recipientName = clean(d.recipientName ?? '')
+    if (!recipientName) throw new ApiError(422, 'Nhập tên người nhận.')
+    const idNote = clean(d.idNote ?? '')
+    if (!idNote) throw new ApiError(422, 'Ghi cách xác thực người nhận.')
+    if (d.relation !== 'CHINH_CHU' && d.relation !== 'NHAN_HO') throw new ApiError(422, 'Chọn người nhận là chính chủ hay nhận hộ.')
+    if (!Number.isFinite(d.inspectionFee) || d.inspectionFee < 0) throw new ApiError(422, 'Phí kiểm tra không hợp lệ.')
+    c.handover = { ...d, recipientName, idNote, recipientPhone: clean(d.recipientPhone ?? ''), withoutRepair, by: user.id, at: now() }
+    return { to: 'COMPLETED', note: `Người nhận: ${recipientName} (${d.relation === 'CHINH_CHU' ? 'chính chủ' : 'nhận hộ'})` }
   })
 }
 

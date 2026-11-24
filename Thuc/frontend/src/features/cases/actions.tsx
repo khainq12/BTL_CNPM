@@ -25,7 +25,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
 import { CancelButton, Field, FormDialog, FormSheet, NativeSelect, SubmitButton } from '@/components/form-kit'
 import { InfoList } from '@/components/woms'
-import { PartRows, QuoteBuilder, TaskRows, quoteTotal } from './editors'
+import { PartRows, QuoteBuilder, TaskRows, quoteTotal, untouchedRowsRemoved } from './editors'
 import { techLoad, type ActionKey } from './logic'
 import { PlanChangeDialog } from './plan-change'
 import { PhotoPicker } from './photo-picker'
@@ -407,7 +407,9 @@ function Eligibility({ c, onClose }: P) {
     if (exceptionDone === true) return 'MIEN_PHI'
     return DECISION_RULES.find((r) => r.code === code)!.decision
   }
-  const [decision, setDecision] = useState<EligibilityDecision>(defaultDecision(rule))
+  const allowed = api.allowedDecisions(d.repairable, exceptionDone)
+  // Kết luận mặc định phải nằm trong các lựa chọn được phép (ví dụ sau khi quản lý từ chối ngoại lệ).
+  const [decision, setDecision] = useState<EligibilityDecision>(() => (allowed.includes(defaultDecision(rule)) ? defaultDecision(rule) : allowed[0]))
   const [reason, setReason] = useState('')
   const [items, setItems] = useState(() =>
     d.parts.map((p) => {
@@ -419,7 +421,6 @@ function Eligibility({ c, onClose }: P) {
   const [tried, setTried] = useState(false)
   const m = useCaseAction(api.decideEligibility, 'Đã lưu kết luận bảo hành', onClose)
   const total = quoteTotal(items, labor)
-  const allowed: EligibilityDecision[] = !d.repairable ? ['KHONG_SUA'] : exceptionDone === false ? ['CO_PHI', 'KHONG_SUA'] : exceptionDone === true ? ['MIEN_PHI', 'CO_PHI', 'KHONG_SUA'] : ['MIEN_PHI', 'CO_PHI', 'NGOAI_LE', 'KHONG_SUA']
   return (
     <FormSheet
       open
@@ -429,7 +430,7 @@ function Eligibility({ c, onClose }: P) {
       onSubmit={() => {
         setTried(true)
         if (!reason.trim()) return
-        m.mutate([me, c.id, c.version, { decision, ruleCode: rule, reason, quote: decision === 'CO_PHI' ? { items, labor } : undefined }])
+        m.mutate([me, c.id, c.version, { decision, ruleCode: rule, reason, quote: decision === 'CO_PHI' ? { items: untouchedRowsRemoved(items), labor } : undefined }])
       }}
       footer={
         <>
@@ -622,7 +623,9 @@ function StartRepair({ c, wo, onClose }: P) {
 function FinishRepair({ c, wo, onClose }: P) {
   const me = useMe()
   const db = useDb()
-  const [used, setUsed] = useState<Record<string, number>>(Object.fromEntries((wo?.parts ?? []).map((p) => [p.partId, p.issued - p.used])))
+  // Phần đã nhận mà chưa dùng, chưa trả, chưa chờ trả (khớp finishRepair ở service).
+  const remaining = (p: { issued: number; used: number; returned: number; returnPending: number }) => p.issued - p.used - p.returned - p.returnPending
+  const [used, setUsed] = useState<Record<string, number>>(Object.fromEntries((wo?.parts ?? []).map((p) => [p.partId, remaining(p)])))
   const [note, setNote] = useState('')
   const m = useCaseAction(api.finishRepair, 'Đã chuyển kiểm tra chất lượng', onClose)
   return (
@@ -641,7 +644,7 @@ function FinishRepair({ c, wo, onClose }: P) {
     >
       {(wo?.parts ?? []).map((p) => {
         const part = db.parts.find((x) => x.id === p.partId)!
-        const max = p.issued - p.used
+        const max = remaining(p)
         return (
           <Field key={p.partId} label={`${part.name} (đã nhận ${max})`}>
             {(id) => <Input id={id} type='number' min={0} max={max} className='w-24' value={used[p.partId]} onChange={(e) => setUsed({ ...used, [p.partId]: Math.min(max, Math.max(0, Number(e.target.value))) })} />}

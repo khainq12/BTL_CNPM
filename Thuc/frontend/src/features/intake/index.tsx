@@ -50,7 +50,12 @@ function Intake() {
   const m = useAction(api.createCase)
 
   const devices = db.devices.filter((d) => d.customerId === customerId)
-  const dup = serial.trim() && db.cases.find((c) => OPEN_STATUSES.includes(c.status) && db.devices.find((d) => d.id === c.deviceId)?.serial.toUpperCase() === serial.trim().toUpperCase())
+  // QA-DEF-003: serial đã đăng ký cho khách khác thì không cho tạo phiếu (service cũng chặn).
+  // Khách hiện tại: đã tìm theo SĐT, hoặc chưa bấm "Tìm khách" nhưng SĐT đã có trong hệ thống (service cũng khớp theo SĐT).
+  const currentCustomerId = customerId ?? db.customers.find((c) => c.phone === phone)?.id
+  const owned = !deviceId && serial.trim() ? db.devices.find((d) => d.serial.toUpperCase() === serial.trim().toUpperCase() && d.customerId !== currentCustomerId) : undefined
+  const ownedMsg = owned !== undefined && api.serialOwnedMessage(db, owned)
+  const dup = !owned && serial.trim() && db.cases.find((c) => OPEN_STATUSES.includes(c.status) && db.devices.find((d) => d.id === c.deviceId)?.serial.toUpperCase() === serial.trim().toUpperCase())
 
   function find() {
     if (!PHONE.test(phone)) {
@@ -81,7 +86,7 @@ function Intake() {
     kind: !kind && 'Chọn loại thiết bị.',
     brand: !brand.trim() && 'Nhập hãng.',
     model: !model.trim() && 'Nhập model.',
-    serial: serial.trim().length < 4 && 'Nhập serial in trên tem thiết bị.',
+    serial: ownedMsg || (serial.trim().length < 4 && 'Nhập serial in trên tem thiết bị.'),
     symptom: symptom.trim().length < 10 && 'Mô tả lỗi khách báo, ít nhất 10 ký tự.',
     condition: !condition.trim() && 'Mô tả tình trạng bên ngoài, ghi "Nguyên vẹn" nếu không có vết.',
     acc: !none && acc.length === 0 && 'Chọn phụ kiện hoặc "Không có phụ kiện".',
@@ -183,8 +188,18 @@ function Intake() {
                       inputMode='tel'
                       value={phone}
                       onChange={(e) => {
-                        setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))
+                        const next = e.target.value.replace(/\D/g, '').slice(0, 10)
+                        if (next === phone) return
+                        setPhone(next)
                         setLooked(null)
+                        // Đổi số điện thoại thì bỏ khách, thông tin điền sẵn và thiết bị đã chọn theo số cũ,
+                        // tránh gắn phiếu nhầm khách hoặc ghi tên khách cũ đè lên hồ sơ khách khác.
+                        if (customerId) {
+                          setCustomerId(undefined)
+                          setName('')
+                          setEmail('')
+                        }
+                        setDeviceId('')
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -247,7 +262,7 @@ function Intake() {
                 <Field label='Model' required error={show(errs.model)}>
                   {(id) => <Input id={id} value={model} disabled={!!deviceId} onChange={(e) => setModel(e.target.value)} placeholder='Latitude 5420' />}
                 </Field>
-                <Field label='Serial' required error={show(errs.serial)}>
+                <Field label='Serial' required error={show(errs.serial) || ownedMsg}>
                   {(id) => <Input id={id} value={serial} disabled={!!deviceId} className='font-mono uppercase' onChange={(e) => setSerial(e.target.value)} />}
                 </Field>
               </div>

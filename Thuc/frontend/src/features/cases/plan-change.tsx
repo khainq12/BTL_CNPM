@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
 import { CancelButton, Field, FormDialog, FormSheet, NativeSelect, SubmitButton } from '@/components/form-kit'
 import { InfoList, Pill, Section, useName } from '@/components/woms'
-import { PartRows, QuoteBuilder, TaskRows, quoteTotal, type PartRow, type QuoteItem, type TaskRow } from './editors'
+import { PartRows, QuoteBuilder, TaskRows, quoteTotal, untouchedRowsRemoved, type PartRow, type QuoteItem, type TaskRow } from './editors'
 
 // Đổi phương án khi đang sửa (BR-12): KTV đề xuất → CSKH xét lại bảo hành/báo giá → (quản lý duyệt nếu vượt ngưỡng)
 // → khách xác nhận lại. Trong lúc chờ, KTV tạm ngừng công việc.
@@ -151,7 +151,7 @@ function Review({ c, onClose }: P) {
       onSubmit={() => {
         setTried(true)
         if (!note.trim()) return
-        m.mutate([me, c.id, c.version, { result, note, quote: result === 'CO_PHI' ? { items, labor } : undefined }])
+        m.mutate([me, c.id, c.version, { result, note, quote: result === 'CO_PHI' ? { items: untouchedRowsRemoved(items), labor } : undefined }])
       }}
       footer={
         <>

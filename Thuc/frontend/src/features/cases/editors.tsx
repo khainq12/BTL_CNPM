@@ -74,6 +74,10 @@ export function quoteTotal(items: QuoteItem[], labor: number) {
   return items.reduce((s, i) => s + i.qty * i.unitPrice, 0) + labor
 }
 
+// Bỏ dòng "Thêm hạng mục" chưa điền gì (tên trống, số lượng 1, đơn giá 0) trước khi gửi.
+// Dòng đã sửa dở (có giá hoặc đổi số lượng nhưng chưa có tên) vẫn gửi để service báo lỗi rõ.
+export const untouchedRowsRemoved = (items: QuoteItem[]) => items.filter((i) => i.label.trim() || i.unitPrice !== 0 || i.qty !== 1)
+
 export function QuoteBuilder({ title, items, onItems, labor, onLabor }: { title: string; items: QuoteItem[]; onItems: (v: QuoteItem[]) => void; labor: number; onLabor: (v: number) => void }) {
   const total = useMemo(() => quoteTotal(items, labor), [items, labor])
   const set = (i: number, patch: Partial<QuoteItem>) => onItems(items.map((x, j) => (j === i ? { ...x, ...patch } : x)))

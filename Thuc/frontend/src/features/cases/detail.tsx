@@ -25,7 +25,7 @@ import { canSeeCustomer, canViewCase, nextActions, type ActionKey } from './logi
 export function CaseDetail({ id }: { id: string }) {
   return (
     <Guard page='caseDetail'>
-      <Detail id={id} />
+      <Detail key={id} id={id} />
     </Guard>
   )
 }
@@ -34,6 +34,7 @@ function Detail({ id }: { id: string }) {
   const db = useDb()
   const me = useMe()
   const [action, setAction] = useState<ActionKey | null>(null)
+  const [tab, setTab] = useState('overview')
   const c = db.cases.find((x) => x.id === id)
   const wo = db.workOrders.find((w) => w.id === c?.workOrderId)
 
@@ -49,6 +50,11 @@ function Detail({ id }: { id: string }) {
   const actions = nextActions(me, c, wo)
   const sla = slaInfo(c)
   const change = openChange(c)
+  // Kho: thao tác linh kiện nằm ở thẻ "Lệnh sửa chữa" (WoParts), không mở hộp thoại riêng.
+  const openParts = () => {
+    setTab('wo')
+    requestAnimationFrame(() => (document.getElementById('wo-parts') ?? document.getElementById('case-tabs'))?.scrollIntoView({ block: 'start' }))
+  }
 
   return (
     <PageShell
@@ -66,7 +72,7 @@ function Detail({ id }: { id: string }) {
       <Stepper c={c} />
 
       <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start'>
-        <Tabs defaultValue='overview' className='min-w-0'>
+        <Tabs id='case-tabs' value={tab} onValueChange={setTab} className='min-w-0 scroll-mt-20'>
           <div className='no-scrollbar overflow-x-auto'>
             <TabsList>
               <TabsTrigger value='overview'>Tổng quan</TabsTrigger>
@@ -130,7 +136,7 @@ function Detail({ id }: { id: string }) {
                       <TooltipContent>{a.disabled}</TooltipContent>
                     </Tooltip>
                   ) : (
-                    <Button key={a.key} variant={a.primary ? 'default' : 'outline'} onClick={() => setAction(a.key)}>
+                    <Button key={a.key} variant={a.primary ? 'default' : 'outline'} onClick={() => (a.key === 'warehouse' ? openParts() : setAction(a.key))}>
                       {a.label}
                     </Button>
                   )
@@ -376,9 +382,11 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
           ))}
         </ul>
       </Section>
-      <Section title='Linh kiện'>
-        <WoParts wo={wo} />
-      </Section>
+      <div id='wo-parts' className='scroll-mt-20'>
+        <Section title='Linh kiện'>
+          <WoParts wo={wo} />
+        </Section>
+      </div>
       <PlanChangeList c={c} />
       <Section title='Nhật ký sửa chữa'>
         {mine && (

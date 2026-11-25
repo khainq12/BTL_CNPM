@@ -72,7 +72,9 @@ export class StateStore {
         db.workOrders = workOrders.map(M.woFromRow)
         db.approvals = approvals.map(M.approvalFromRow)
         db.complaints = complaints.map(M.complaintFromRow)
-        db.stockMoves = stockMoves.map((s) => M.plain({ ...s, at: s.at.toISOString(), woCode: s.woCode ?? undefined, note: s.note ?? undefined })) as Db['stockMoves']
+        db.stockMoves = stockMoves.map((s) =>
+          M.plain({ ...s, at: s.at.toISOString(), woCode: s.woCode ?? undefined, note: s.note ?? undefined })
+        ) as Db['stockMoves']
         db.audit = audit.map((a) => M.plain({ ...a, at: a.at.toISOString(), detail: a.detail ?? undefined })) as Db['audit']
         db.holidays = holidays
         db.counters = countersFrom(counters)
@@ -89,7 +91,12 @@ export class StateStore {
 
   private async load(tx: Tx, s: Scope): Promise<Db> {
     const db = emptyDb()
-    const [users, parts, holidays, counters] = await Promise.all([tx.user.findMany(), tx.part.findMany(), tx.holiday.findMany({ orderBy: { date: 'asc' } }), tx.counter.findMany()])
+    const [users, parts, holidays, counters] = await Promise.all([
+      tx.user.findMany(),
+      tx.part.findMany(),
+      tx.holiday.findMany({ orderBy: { date: 'asc' } }),
+      tx.counter.findMany(),
+    ])
     db.users = users.map(M.userFromRow)
     db.parts = parts.map(M.partFromRow)
     db.holidays = holidays
@@ -130,7 +137,14 @@ export class StateStore {
     const woRows = ids.length ? await tx.workOrder.findMany({ where: { caseId: { in: ids } } }) : []
     const woIds = woRows.map((w) => w.id)
     const approvals = await tx.approval.findMany({
-      where: { OR: [{ status: 'CHO_DUYET' }, { type: 'MUA_LINH_KIEN', status: 'DA_DUYET' }, ...(ids.length ? [{ caseId: { in: ids } }] : []), ...(woIds.length ? [{ woId: { in: woIds } }] : [])] },
+      where: {
+        OR: [
+          { status: 'CHO_DUYET' },
+          { type: 'MUA_LINH_KIEN', status: 'DA_DUYET' },
+          ...(ids.length ? [{ caseId: { in: ids } }] : []),
+          ...(woIds.length ? [{ woId: { in: woIds } }] : []),
+        ],
+      },
     })
     db.approvals = approvals.map(M.approvalFromRow)
     if (approvalById && !db.approvals.some((a) => a.id === approvalById.id)) db.approvals.push(approvalById)
@@ -236,7 +250,10 @@ export class StateStore {
     for (const [d] of oldHol) if (!newHol.has(d)) await tx.holiday.delete({ where: { date: d } })
     for (const [d, name] of newHol) if (oldHol.get(d) !== name) await tx.holiday.upsert({ where: { date: d }, create: { date: d, name }, update: { name } })
 
-    if (outbox.length) await tx.outboxEvent.createMany({ data: outbox.map((o) => ({ id: randomUUID(), type: o.type, aggregateId: o.aggregateId, payload: o.payload as Prisma.InputJsonValue })) })
+    if (outbox.length)
+      await tx.outboxEvent.createMany({
+        data: outbox.map((o) => ({ id: randomUUID(), type: o.type, aggregateId: o.aggregateId, payload: o.payload as Prisma.InputJsonValue })),
+      })
     if (outbox.length) this.log.debug(`outbox +${outbox.length}`)
   }
 }
@@ -245,7 +262,14 @@ function statusChanged(prev: WarrantyCase, c: WarrantyCase): OutboxDraft {
   return {
     type: 'CaseStatusChanged',
     aggregateId: c.id,
-    payload: { code: c.code, from: prev.status, to: c.status, publicStepFrom: PUBLIC_STEP_OF[prev.status], publicStepTo: PUBLIC_STEP_OF[c.status], planConfirmedAt: c.sla.planConfirmedAt },
+    payload: {
+      code: c.code,
+      from: prev.status,
+      to: c.status,
+      publicStepFrom: PUBLIC_STEP_OF[prev.status],
+      publicStepTo: PUBLIC_STEP_OF[c.status],
+      planConfirmedAt: c.sla.planConfirmedAt,
+    },
   }
 }
 

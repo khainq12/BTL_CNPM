@@ -47,7 +47,12 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
   async drain(batch = 50): Promise<number> {
     let done = 0
     for (;;) {
-      const pending = await this.prisma.outboxEvent.findMany({ where: { processedAt: null, attempts: { lt: 5 } }, orderBy: { createdAt: 'asc' }, take: batch, select: { id: true } })
+      const pending = await this.prisma.outboxEvent.findMany({
+        where: { processedAt: null, attempts: { lt: 5 } },
+        orderBy: { createdAt: 'asc' },
+        take: batch,
+        select: { id: true },
+      })
       if (!pending.length) return done
       for (const { id } of pending) if (await this.processOne(id)) done += 1
       if (pending.length < batch) return done
@@ -78,11 +83,15 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
           case 'CaseStatusChanged': {
             const to = p.to as CaseStatus
             const important = ['WAITING_INFORMATION', 'QUOTED', 'RETURN_PENDING', 'READY_FOR_DELIVERY', 'COMPLETED', 'CANCELLED'].includes(to)
-            if (p.publicStepFrom !== p.publicStepTo || important)
+            if (p.publicStepFrom !== p.publicStepTo || important || p.from === 'QUOTED')
               notes.push({ channel: 'SMS', message: `WOMS: Phiếu ${p.code} – ${PUBLIC_STEPS[Number(p.publicStepTo)]}. ${PUBLIC_NOTE[to] ?? ''}`.trim() })
             // Hạn 3 ngày làm việc bắt đầu khi phương án sửa được xác nhận (PARAM-08): ghi mốc khởi tạo SLA.
             if (p.planConfirmedAt && ['ELIGIBILITY_REVIEW', 'QUOTED'].includes(String(p.from)) && ['WO_CREATED', 'READY_TO_REPAIR'].includes(to))
-              audit.push({ ref: String(p.code), action: 'Khởi tạo SLA sửa chữa (SlaStarted)', detail: `Bắt đầu tính hạn 3 ngày làm việc từ ${p.planConfirmedAt}` })
+              audit.push({
+                ref: String(p.code),
+                action: 'Khởi tạo SLA sửa chữa (SlaStarted)',
+                detail: `Bắt đầu tính hạn 3 ngày làm việc từ ${p.planConfirmedAt}`,
+              })
             break
           }
           case 'ApprovalRequested':
@@ -93,16 +102,34 @@ export class OutboxWorker implements OnApplicationBootstrap, OnModuleDestroy {
         }
         if (notes.length)
           await tx.notification.createMany({
-            data: notes.map((n, i) => ({ id: randomUUID(), eventId: `${ev.id}:${i}`, caseId: ev.type === 'ApprovalRequested' ? String(p.caseId ?? '') : ev.aggregateId, channel: n.channel, message: n.message })),
+            data: notes.map((n, i) => ({
+              id: randomUUID(),
+              eventId: `${ev.id}:${i}`,
+              caseId: ev.type === 'ApprovalRequested' ? String(p.caseId ?? '') : ev.aggregateId,
+              channel: n.channel,
+              message: n.message,
+            })),
             skipDuplicates: true,
           })
         if (audit.length)
-          await tx.auditLog.createMany({ data: audit.map((a) => ({ id: `log-${randomUUID().slice(0, 12)}`, at: new Date(), by: 'he-thong', entity: 'PHIEU', ref: a.ref, action: a.action, detail: a.detail ?? null })) })
+          await tx.auditLog.createMany({
+            data: audit.map((a) => ({
+              id: `log-${randomUUID().slice(0, 12)}`,
+              at: new Date(),
+              by: 'he-thong',
+              entity: 'PHIEU',
+              ref: a.ref,
+              action: a.action,
+              detail: a.detail ?? null,
+            })),
+          })
         await tx.outboxEvent.update({ where: { id: ev.id }, data: { processedAt: new Date(), attempts: ev.attempts + 1 } })
         return true
       })
     } catch (e) {
-      await this.prisma.outboxEvent.update({ where: { id }, data: { attempts: { increment: 1 }, lastError: String((e as Error).message).slice(0, 500) } }).catch(() => undefined)
+      await this.prisma.outboxEvent
+        .update({ where: { id }, data: { attempts: { increment: 1 }, lastError: String((e as Error).message).slice(0, 500) } })
+        .catch(() => undefined)
       this.log.error(`Sự kiện ${id} lỗi`, e as Error)
       return false
     }

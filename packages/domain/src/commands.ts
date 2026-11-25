@@ -31,7 +31,8 @@ import { ApiError } from './errors'
 
 const now = () => new Date().toISOString()
 // randomUUID chỉ có trong secure context (https/localhost); trang mở qua http thường thì dùng Math.random.
-const rand = () => (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2))
+const rand = () =>
+  globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID().replace(/-/g, '') : Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
 const uid = (p: string) => `${p}-${rand().slice(0, 12)}`
 
 function need(user: User, roles: Role[]) {

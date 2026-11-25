@@ -26,7 +26,8 @@ const TABLES = [
 ]
 
 export async function seed(prisma: PrismaClient, password = process.env.SEED_PASSWORD || DEMO_PASSWORD) {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== '1') throw new Error('Không nạp dữ liệu mẫu ở production (đặt ALLOW_SEED=1 nếu thật sự cần).')
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== '1')
+    throw new Error('Không nạp dữ liệu mẫu ở production (đặt ALLOW_SEED=1 nếu thật sự cần).')
   const db = createSeedDb()
   const hash = await bcrypt.hash(password, 10)
   for (const u of db.users) u.password = hash

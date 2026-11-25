@@ -20,7 +20,15 @@ export const userFromRow = (r: Row<Prisma.UserGetPayload<object>>): User => ({
   phone: r.phone,
   active: r.active,
 })
-export const userToRow = (u: User) => ({ id: u.id, username: u.username, passwordHash: u.password, name: u.name, role: u.role, phone: u.phone ?? '', active: u.active })
+export const userToRow = (u: User) => ({
+  id: u.id,
+  username: u.username,
+  passwordHash: u.password,
+  name: u.name,
+  role: u.role,
+  phone: u.phone ?? '',
+  active: u.active,
+})
 
 export const customerFromRow = (r: { id: string; name: string; phone: string; email: string | null }): Customer =>
   plain({ id: r.id, name: r.name, phone: r.phone, email: r.email ?? undefined })
@@ -69,7 +77,9 @@ export function caseFromRow(r: CaseRow): WarrantyCase {
     createdAt: r.createdAt.toISOString(),
     events: [...r.events]
       .sort((a, b) => a.seq - b.seq)
-      .map((e) => plain({ at: e.at.toISOString(), by: e.by, action: e.action, from: e.fromStatus ?? undefined, to: e.toStatus ?? undefined, note: e.note ?? undefined })),
+      .map((e) =>
+        plain({ at: e.at.toISOString(), by: e.by, action: e.action, from: e.fromStatus ?? undefined, to: e.toStatus ?? undefined, note: e.note ?? undefined })
+      ),
   }) as WarrantyCase
 }
 export function caseToRow(c: WarrantyCase) {
@@ -89,7 +99,14 @@ export const caseEventRows = (c: WarrantyCase, fromSeq: number) =>
   }))
 
 export function woFromRow(r: Row<Prisma.WorkOrderGetPayload<object>>): WorkOrder {
-  return plain({ ...((r.data ?? {}) as object), id: r.id, code: r.code, caseId: r.caseId, technicianId: r.technicianId ?? undefined, createdAt: r.createdAt.toISOString() }) as WorkOrder
+  return plain({
+    ...((r.data ?? {}) as object),
+    id: r.id,
+    code: r.code,
+    caseId: r.caseId,
+    technicianId: r.technicianId ?? undefined,
+    createdAt: r.createdAt.toISOString(),
+  }) as WorkOrder
 }
 export function woToRow(w: WorkOrder) {
   const { id, code, caseId, technicianId, createdAt, ...rest } = w
@@ -111,7 +128,17 @@ export function approvalFromRow(r: Row<Prisma.ApprovalGetPayload<object>>): Appr
 }
 export function approvalToRow(a: Approval) {
   const { id, type, status, caseId, woId, partId, requestedBy, requestedAt, ...rest } = a
-  return { id, type, status, caseId: caseId ?? null, woId: woId ?? null, partId: partId ?? null, requestedBy, requestedAt: new Date(requestedAt), data: json(plain(rest)) }
+  return {
+    id,
+    type,
+    status,
+    caseId: caseId ?? null,
+    woId: woId ?? null,
+    partId: partId ?? null,
+    requestedBy,
+    requestedAt: new Date(requestedAt),
+    data: json(plain(rest)),
+  }
 }
 
 export function complaintFromRow(r: Row<Prisma.ComplaintGetPayload<object>>): Complaint {

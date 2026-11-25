@@ -19,7 +19,11 @@ export class WorkspaceController {
   constructor(@Inject(StateStore) private readonly store: StateStore) {}
 
   @Get('workspace')
-  @Doc('Dữ liệu làm việc của tài khoản (đã lọc theo vai trò)', undefined, 'KTV/kho/QC chỉ nhận phiếu được giao và không nhận SĐT/email khách; nhật ký thao tác chỉ quản lý nhận (AT-14, NFR-01).')
+  @Doc(
+    'Dữ liệu làm việc của tài khoản (đã lọc theo vai trò)',
+    undefined,
+    'KTV/kho/QC chỉ nhận phiếu được giao và không nhận SĐT/email khách; nhật ký thao tác chỉ quản lý nhận (AT-14, NFR-01).'
+  )
   async workspace(@Me() me: User) {
     return workspaceView(await this.store.snapshot(), me)
   }
@@ -62,7 +66,12 @@ export class CasesController {
     const wo = db.workOrders.find((w) => w.caseId === c.id)
     if (!canViewCase(me, c, wo)) throw new ApiError(403, 'Bạn không được giao xử lý phiếu này.')
     const view = workspaceView({ ...db, cases: [c], workOrders: wo ? [wo] : [] }, me)
-    return { case: view.cases[0], workOrder: view.workOrders[0], customer: view.customers.find((x) => x.id === c.customerId), device: view.devices.find((x) => x.id === c.deviceId) }
+    return {
+      case: view.cases[0],
+      workOrder: view.workOrders[0],
+      customer: view.customers.find((x) => x.id === c.customerId),
+      device: view.devices.find((x) => x.id === c.deviceId),
+    }
   }
 
   @Post()
@@ -79,6 +88,7 @@ export class CasesController {
   }
 
   @Post(':id/accept-online')
+  @HttpCode(200)
   @Roles('TN')
   @Doc('Nhận máy của yêu cầu trực tuyến, lập biên nhận (PENDING_ACCEPT → RECEIVED)', S.acceptOnline)
   acceptOnline(@Me() me: User, @Param('id') id: string, @Body(zp(S.acceptOnline)) b: B<'acceptOnline'>) {
@@ -86,6 +96,7 @@ export class CasesController {
   }
 
   @Post(':id/cancel-request')
+  @HttpCode(200)
   @Roles('TN', 'CSKH')
   @Doc('Đề nghị hủy phiếu (quản lý duyệt)', S.reason)
   cancel(@Me() me: User, @Param('id') id: string, @Body(zp(S.reason)) b: B<'reason'>) {
@@ -100,6 +111,7 @@ export class CasesController {
   }
 
   @Post(':id/info-request')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('Yêu cầu khách bổ sung thông tin (PRECHECK → WAITING_INFORMATION)', S.reason)
   infoRequest(@Me() me: User, @Param('id') id: string, @Body(zp(S.reason)) b: B<'reason'>) {
@@ -107,6 +119,7 @@ export class CasesController {
   }
 
   @Post(':id/info-supplied')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('Khách đã bổ sung thông tin (WAITING_INFORMATION → PRECHECK)', S.note)
   infoSupplied(@Me() me: User, @Param('id') id: string, @Body(zp(S.note)) b: B<'note'>) {
@@ -137,6 +150,7 @@ export class CasesController {
   }
 
   @Post(':id/quote/send')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('Gửi báo giá đã được quản lý duyệt cho khách', S.versionOnly)
   sendQuote(@Me() me: User, @Param('id') id: string, @Body(zp(S.versionOnly)) b: B<'versionOnly'>) {
@@ -144,6 +158,7 @@ export class CasesController {
   }
 
   @Post(':id/quote/response')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('Ghi nhận khách đồng ý/từ chối báo giá (C08)', S.quoteResponse)
   quoteResponse(@Me() me: User, @Param('id') id: string, @Body(zp(S.quoteResponse)) b: B<'quoteResponse'>) {
@@ -152,6 +167,7 @@ export class CasesController {
   }
 
   @Post(':id/return-conclusion')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('Kết luận trả thiết bị không sửa (BR-23)', S.returnConclusion)
   returnConclusion(@Me() me: User, @Param('id') id: string, @Body(zp(S.returnConclusion)) b: B<'returnConclusion'>) {
@@ -166,6 +182,7 @@ export class CasesController {
   }
 
   @Post(':id/repair/start')
+  @HttpCode(200)
   @Roles('KTV')
   @Doc('Bắt đầu sửa (cần nhận đủ linh kiện, BR-13)', S.versionOnly)
   startRepair(@Me() me: User, @Param('id') id: string, @Body(zp(S.versionOnly)) b: B<'versionOnly'>) {
@@ -173,6 +190,7 @@ export class CasesController {
   }
 
   @Post(':id/repair/finish')
+  @HttpCode(200)
   @Roles('KTV')
   @Doc('Hoàn tất sửa, chuyển kiểm tra chất lượng (BR-19)', S.finishRepair)
   finishRepair(@Me() me: User, @Param('id') id: string, @Body(zp(S.finishRepair)) b: B<'finishRepair'>) {
@@ -180,6 +198,7 @@ export class CasesController {
   }
 
   @Post(':id/plan-changes')
+  @HttpCode(200)
   @Roles('KTV')
   @Doc('Đề xuất đổi phương án khi đang sửa (BR-12)', S.planChange)
   proposePlanChange(@Me() me: User, @Param('id') id: string, @Body(zp(S.planChange)) b: B<'planChange'>) {
@@ -188,6 +207,7 @@ export class CasesController {
   }
 
   @Post(':id/plan-changes/current/review')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('CSKH xét đề xuất đổi phương án', S.planReview)
   reviewPlanChange(@Me() me: User, @Param('id') id: string, @Body(zp(S.planReview)) b: B<'planReview'>) {
@@ -196,6 +216,7 @@ export class CasesController {
   }
 
   @Post(':id/plan-changes/current/send-quote')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('Gửi báo giá bổ sung đã duyệt cho khách (tạm dừng hạn, PARAM-16)', S.versionOnly)
   sendPlanChangeQuote(@Me() me: User, @Param('id') id: string, @Body(zp(S.versionOnly)) b: B<'versionOnly'>) {
@@ -203,6 +224,7 @@ export class CasesController {
   }
 
   @Post(':id/plan-changes/current/response')
+  @HttpCode(200)
   @Roles('CSKH')
   @Doc('Ghi nhận khách đồng ý/từ chối báo giá bổ sung', S.planResponse)
   respondPlanChange(@Me() me: User, @Param('id') id: string, @Body(zp(S.planResponse)) b: B<'planResponse'>) {
@@ -211,6 +233,7 @@ export class CasesController {
   }
 
   @Post(':id/qc')
+  @HttpCode(200)
   @Roles('QC')
   @Doc('Ghi kết quả kiểm tra chất lượng theo danh mục bắt buộc (BR-20); sửa lại tối đa 2 lần (PARAM-10)', S.qc)
   qc(@Me() me: User, @Param('id') id: string, @Body(zp(S.qc)) b: B<'qc'>) {
@@ -218,9 +241,9 @@ export class CasesController {
   }
 
   @Post(':id/handover')
+  @HttpCode(200)
   @Roles('TN')
   @Doc('Bàn giao thiết bị có xác nhận của người nhận (BR-23, BR-24)', S.handover)
-  @HttpCode(200)
   handover(@Me() me: User, @Param('id') id: string, @Body(zp(S.handover)) b: B<'handover'>) {
     const { version, ...d } = b
     return this.run(me, id, (db) => C.handover(db, me, id, version, d))

@@ -1,0 +1,195 @@
+# CI: mỗi lần đẩy code / mở Pull Request đều chạy đủ cổng chất lượng theo kim tự tháp kiểm thử
+#   quality (typecheck, lint, format) → unit → API + PostgreSQL thật → E2E trình duyệt → báo cáo truy vết
+# Tham khảo: docs.github.com/actions (service containers), playwright.dev/docs/ci, martinfowler.com/articles/practical-test-pyramid.html
+name: CI
+
+on:
+  push:
+    # main chạy CI qua workflow CD (gọi lại workflow này) để không chạy hai lần.
+    branches-ignore: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_call:
+  pull_request:
+    branches: [main, integration]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  CI: '1'
+
+jobs:
+  quality:
+    name: Kiểm tra mã (typecheck, lint, format)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+      - name: Build package nghiệp vụ dùng chung
+        run: npm run build:domain
+      - name: Typecheck (domain, api, staff-web, portal)
+        run: |
+          npm run typecheck -w @woms/domain
+          npm run typecheck -w @woms/api
+          npm run typecheck -w @woms/staff-web
+          npm run typecheck -w @woms/portal
+          npx tsc --noEmit -p e2e/tsconfig.json
+      - name: ESLint (staff-web)
+        run: npm run lint -w @woms/staff-web
+      - name: Prettier (domain, api, e2e, scripts)
+        run: npm run format:check
+      - name: Kiểm tra lỗ hổng thư viện (chỉ cảnh báo)
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::npm audit báo lỗ hổng, xem log"
+
+  unit:
+    name: Unit test (nghiệp vụ, portal, frontend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+      - run: npm run build:domain
+      - name: Domain (quy tắc nghiệp vụ) + độ phủ
+        run: npx vitest run --coverage
+        working-directory: packages/domain
+      - name: Portal (bản mẫu TV7)
+        run: npm run test -w @woms/portal
+      - name: Cài Chromium cho test component của staff-web
+        run: npx playwright install --with-deps chromium
+      - name: Staff-web (component test trên trình duyệt)
+        run: npm run test -w @woms/staff-web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-unit
+          path: |
+            reports/junit/domain.xml
+            reports/junit/portal.xml
+            reports/junit/staff-web.xml
+            reports/coverage/
+          if-no-files-found: warn
+
+  api:
+    name: Tích hợp API + PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: woms, POSTGRES_PASSWORD: woms, POSTGRES_DB: woms_test }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U woms -d woms_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://woms:woms@localhost:5432/woms_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+      - run: npm run test:api
+      - name: Xuất đặc tả OpenAPI
+        run: node apps/api/dist/openapi.js reports/openapi.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-api
+          path: |
+            reports/junit/api.xml
+            reports/openapi.json
+
+  e2e:
+    name: E2E (Playwright, trình duyệt thật)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [quality]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env: { POSTGRES_USER: woms, POSTGRES_PASSWORD: woms, POSTGRES_DB: woms_e2e }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U woms -d woms_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      E2E_DATABASE_URL: postgresql://woms:woms@localhost:5432/woms_e2e?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+      - run: npm run build:domain && npm run build -w @woms/api
+      - name: Cài Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Chạy kịch bản E2E
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            reports/playwright/
+            reports/playwright-artifacts/
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-e2e
+          path: reports/junit/e2e.xml
+
+  report:
+    name: Báo cáo kiểm thử + ma trận truy vết
+    runs-on: ubuntu-latest
+    needs: [unit, api, e2e]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: junit-*
+          path: reports
+          merge-multiple: true
+      - name: Tổng hợp (ghi vào Summary của lần chạy)
+        run: node scripts/test-report.mjs --strict
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report
+          path: |
+            reports/test-report.md
+            reports/test-report.html
+            reports/WOMS_QA_Ket_qua_tu_dong.xlsx
+            reports/openapi.json
+
+  docker:
+    name: Build Docker image (kiểm tra, không đẩy)
+    runs-on: ubuntu-latest
+    needs: [quality]
+    strategy:
+      matrix:
+        app: [api, staff-web, portal]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

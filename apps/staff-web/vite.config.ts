@@ -19,14 +19,15 @@ export default defineConfig({
   resolve: {
     // @/domain/* trỏ tới quy tắc nghiệp vụ dùng chung (packages/domain), phần còn lại của @/ là mã frontend.
     alias: [
-      { find: /^@\/domain\/(.*)$/, replacement: path.resolve(__dirname, '../../packages/domain/src/$1') },
-      { find: /^@\/(.*)$/, replacement: path.resolve(__dirname, './src/$1') },
+      { find: /^@\/domain\/(.*)$/, replacement: path.resolve(import.meta.dirname, '../../packages/domain/src/$1') },
+      { find: /^@\/(.*)$/, replacement: path.resolve(import.meta.dirname, './src/$1') },
     ],
   },
   server: { port: 5173, strictPort: true },
   preview: { port: 4173, strictPort: true },
   test: {
     silent: 'passed-only',
+    reporters: process.env.CI ? ['default', ['junit', { outputFile: '../../reports/junit/staff-web.xml', suiteName: 'staff-web' }]] : ['default'],
     unstubEnvs: true,
     browser: {
       enabled: true,

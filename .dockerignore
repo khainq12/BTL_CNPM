@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+reports
+.local-pg
+.git
+docs
+**/*.docx
+**/*.xlsx
+**/*.pdf
+**/.env

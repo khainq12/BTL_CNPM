@@ -19,10 +19,25 @@ const config = loadConfig()
 
 @Module({
   imports: [
-    JwtModule.register({ secret: config.JWT_SECRET, signOptions: { expiresIn: `${config.JWT_TTL_HOURS}h`, issuer: 'woms-api', audience: 'woms-staff' }, verifyOptions: { issuer: 'woms-api', audience: 'woms-staff' } }),
+    JwtModule.register({
+      secret: config.JWT_SECRET,
+      signOptions: { expiresIn: `${config.JWT_TTL_HOURS}h`, issuer: 'woms-api', audience: 'woms-staff' },
+      verifyOptions: { issuer: 'woms-api', audience: 'woms-staff' },
+    }),
     ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: 600 }], skipIf: () => process.env.THROTTLE_DISABLED === '1' }),
   ],
-  controllers: [HealthController, AuthController, WorkspaceController, CasesController, WorkOrdersController, InventoryController, ApprovalsController, ComplaintsController, AdminController, PublicController],
+  controllers: [
+    HealthController,
+    AuthController,
+    WorkspaceController,
+    CasesController,
+    WorkOrdersController,
+    InventoryController,
+    ApprovalsController,
+    ComplaintsController,
+    AdminController,
+    PublicController,
+  ],
   providers: [
     { provide: CONFIG, useFactory: (): AppConfig => loadConfig() },
     PrismaService,

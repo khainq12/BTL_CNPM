@@ -39,7 +39,11 @@ export class PublicController {
 
   @Post('lookup')
   @HttpCode(200)
-  @Doc('Tra cứu phiếu bằng mã phiếu + số điện thoại', S.publicLookup, 'Sai mã hoặc sai số điện thoại đều trả 404 cùng thông báo, không lộ phiếu có tồn tại hay không.')
+  @Doc(
+    'Tra cứu phiếu bằng mã phiếu + số điện thoại',
+    S.publicLookup,
+    'Sai mã hoặc sai số điện thoại đều trả 404 cùng thông báo, không lộ phiếu có tồn tại hay không.'
+  )
   async lookup(@Body(zp(S.publicLookup)) b: B<'publicLookup'>) {
     const c = await this.find(b.code, b.phone)
     const [devices, siblings, notes] = await Promise.all([
@@ -63,13 +67,21 @@ export class PublicController {
     const c = await this.store.execute({ idempotencyKey: key.trim(), intake: { phone: b.customer.phone.trim(), serial: b.device.serial.trim() } }, (db) =>
       C.createOnlineRequest(db, b as C.OnlineRequestInput, key)
     )
-    return { code: c.code, status: 'PENDING_ACCEPT', message: 'Đã ghi nhận yêu cầu. Vui lòng mang thiết bị tới trung tâm và đọc mã phiếu cho nhân viên tiếp nhận.' }
+    return {
+      code: c.code,
+      status: 'PENDING_ACCEPT',
+      message: 'Đã ghi nhận yêu cầu. Vui lòng mang thiết bị tới trung tâm và đọc mã phiếu cho nhân viên tiếp nhận.',
+    }
   }
 
   @Post('quote-response')
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @Doc('Khách đồng ý/từ chối báo giá đang chờ, xác nhận bằng OTP (TV7-06, C08)', S.publicQuote, 'Bản hiện tại chưa gửi OTP thật: mã OTP cấu hình bằng PORTAL_DEMO_OTP.')
+  @Doc(
+    'Khách đồng ý/từ chối báo giá đang chờ, xác nhận bằng OTP (TV7-06, C08)',
+    S.publicQuote,
+    'Bản hiện tại chưa gửi OTP thật: mã OTP cấu hình bằng PORTAL_DEMO_OTP.'
+  )
   async quoteResponse(@Body(zp(S.publicQuote)) b: B<'publicQuote'>) {
     const c = await this.find(b.code, b.phone)
     if (b.otp !== this.config.PORTAL_DEMO_OTP) throw new ApiError(422, 'Mã OTP chưa đúng.')

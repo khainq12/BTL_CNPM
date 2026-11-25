@@ -38,7 +38,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
 function codeOf(status: number) {
   return (
-    { 400: 'BAD_REQUEST', 401: 'UNAUTHENTICATED', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'VERSION_CONFLICT', 422: 'BUSINESS_RULE', 429: 'TOO_MANY_REQUESTS', 503: 'UNAVAILABLE' }[status] ??
-    'ERROR'
+    {
+      400: 'BAD_REQUEST',
+      401: 'UNAUTHENTICATED',
+      403: 'FORBIDDEN',
+      404: 'NOT_FOUND',
+      409: 'VERSION_CONFLICT',
+      422: 'BUSINESS_RULE',
+      429: 'TOO_MANY_REQUESTS',
+      503: 'UNAVAILABLE',
+    }[status] ?? 'ERROR'
   )
 }

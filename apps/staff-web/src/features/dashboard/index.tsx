@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useDb } from '@/api/hooks'
 import { dashboard } from '@/domain/dashboard'
 import { PARAMS } from '@/domain/params'
@@ -27,7 +28,8 @@ function Kpi({ label, value, tone, hint }: { label: string; value: React.ReactNo
 
 function Inner() {
   const db = useDb()
-  const k = dashboard(db, Date.now(), PARAMS.minStock)
+  const [now] = useState(Date.now) // mốc thời gian lúc mở trang; dữ liệu tự làm mới theo useDb
+  const k = dashboard(db, now, PARAMS.minStock)
   const maxStage = Math.max(1, ...k.byStage.map((s) => s.count))
   return (
     <PageShell title='Bảng điều hành' description='Tình hình xử lý phiếu, thời hạn và tải công việc. Thời hạn tính theo giờ làm việc 08:00–17:30, Thứ 2 – Thứ 7, trừ ngày lễ.'>

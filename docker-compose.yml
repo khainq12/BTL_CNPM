@@ -1,0 +1,59 @@
+# Chạy toàn bộ WOMS bằng Docker:
+#   docker compose up -d --build                      # PostgreSQL + API + giao diện nhân viên + cổng khách hàng
+#   docker compose --profile demo run --rm seed       # (tùy chọn) nạp dữ liệu mẫu, CHỈ dùng cho demo
+# Giao diện nhân viên: http://localhost:8080 · Cổng khách hàng: http://localhost:8081 · API/Swagger: http://localhost:3000/api/docs
+# Đổi JWT_SECRET và mật khẩu CSDL trước khi chạy ngoài máy cá nhân (đặt trong file .env cạnh file này).
+name: woms
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-woms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-woms}
+      POSTGRES_DB: woms
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-woms} -d woms']
+      interval: 5s
+      retries: 20
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    image: ${REGISTRY:-ghcr.io/khainq12}/woms-api:${TAG:-main}
+    restart: unless-stopped
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-woms}:${POSTGRES_PASSWORD:-woms}@db:5432/woms?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Đặt JWT_SECRET (>= 32 ký tự ngẫu nhiên) trong .env}
+      CORS_ORIGINS: http://localhost:8080,http://localhost:8081
+      PORTAL_DEMO_OTP: ${PORTAL_DEMO_OTP:-000000}
+    ports: ['3000:3000']
+
+  staff-web:
+    build: { context: ., dockerfile: apps/staff-web/Dockerfile, args: { VITE_API_URL: http://localhost:3000 } }
+    image: ${REGISTRY:-ghcr.io/khainq12}/woms-staff-web:${TAG:-main}
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ['8080:8080']
+
+  portal:
+    build: { context: ., dockerfile: apps/portal/Dockerfile, args: { VITE_API_URL: http://localhost:3000 } }
+    image: ${REGISTRY:-ghcr.io/khainq12}/woms-portal:${TAG:-main}
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ['8081:8080']
+
+  seed:
+    profiles: [demo]
+    image: ${REGISTRY:-ghcr.io/khainq12}/woms-api:${TAG:-main}
+    depends_on: { api: { condition: service_healthy } }
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-woms}:${POSTGRES_PASSWORD:-woms}@db:5432/woms?schema=public
+    command: ['node', 'dist/seed.js']
+
+volumes:
+  pgdata:

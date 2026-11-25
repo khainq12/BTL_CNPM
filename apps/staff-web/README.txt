@@ -13,9 +13,16 @@ CHẠY THỬ
 Mở http://localhost:5173 (cổng mặc định của Vite).
 
 
-TÀI KHOẢN MẪU (dữ liệu giả, chưa nối backend)
+CHẾ ĐỘ CHẠY
 
-Mật khẩu chung: xem hằng DEMO_PASSWORD trong src/mock/seed.ts
+  Không đặt VITE_API_URL: bản chạy thử, dữ liệu giả trong localStorage.
+  VITE_API_URL=http://localhost:3000: gọi backend thật (apps/api), đăng nhập JWT. Xem README ở thư mục gốc.
+  Quy tắc nghiệp vụ (src/domain cũ) nay ở packages/domain, dùng chung với backend.
+
+
+TÀI KHOẢN MẪU
+
+Mật khẩu chung: xem hằng DEMO_PASSWORD trong packages/domain/src/seed.ts
 
   tiepnhan     Nhân viên tiếp nhận
   cskh         Nhân viên CSKH/bảo hành

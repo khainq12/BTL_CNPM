@@ -127,7 +127,7 @@ function Thumb({ photo }: { photo: Photo }) {
     <img src={photo.src} alt={photo.name} className='size-full object-cover' />
   ) : (
     // Dữ liệu mẫu chỉ có tên tệp, chưa có ảnh: hiện khung giữ chỗ kèm tên để vẫn đối chiếu được.
-    <span className='bg-accent/50 text-accent-foreground flex size-full flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(135deg,transparent_0_6px,var(--accent)_6px_7px)] p-1 text-center text-[10px] leading-tight break-all' title='Dữ liệu mẫu chỉ có tên tệp'>
+    <span className='bg-accent/50 text-accent-foreground flex size-full flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(135deg,transparent_0_6px,var(--accent)_6px_7px)] p-1 text-center text-xs leading-tight [overflow-wrap:anywhere]' title='Dữ liệu mẫu chỉ có tên tệp'>
       <ImageIcon className='size-5 opacity-70' aria-hidden />
       {photo.name.replace(/\.[a-z]+$/i, '')}
     </span>

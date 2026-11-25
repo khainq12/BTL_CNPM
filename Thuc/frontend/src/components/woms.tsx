@@ -60,7 +60,7 @@ export function SlaBadge({ c, withDue }: { c: WarrantyCase; withDue?: boolean })
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className='inline-flex flex-col items-start gap-0.5'>
+        <span tabIndex={0} className='focus-visible:ring-ring/50 inline-flex flex-col items-start gap-0.5 rounded-md outline-none focus-visible:ring-[3px]'>
           <Pill tone={SLA_TONE[s.kind]} className={cn(s.kind === 'paused' && 'border border-dashed', s.kind === 'not_started' && 'bg-transparent')}>
             {s.label}
           </Pill>
@@ -90,7 +90,7 @@ export function PageShell({
   return (
     <>
       <Header fixed>
-        <Search className='me-auto' placeholder='Tìm trang, thao tác...' />
+        <Search className='me-auto' placeholder='Tìm trang, mã phiếu, SĐT...' />
         <ThemeSwitch />
         <ProfileDropdown />
       </Header>
@@ -165,13 +165,14 @@ export function useName() {
 
 export function CaseLink({ c }: { c: WarrantyCase }) {
   return (
-    <Link to='/phieu/$id' params={{ id: c.id }} className='font-medium whitespace-nowrap underline-offset-4 hover:underline'>
+    <Link to='/phieu/$id' params={{ id: c.id }} className='font-medium whitespace-nowrap tabular-nums underline-offset-4 hover:underline'>
       {c.code}
     </Link>
   )
 }
 
-export function Section({ title, description, actions, children, className }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
+// flush: nội dung tràn sát mép thẻ (dùng khi bên trong là bảng), tránh viền lồng viền.
+export function Section({ title, description, actions, children, className, flush }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string; flush?: boolean }) {
   return (
     <section className={cn('bg-card rounded-lg border', className)}>
       <header className='flex flex-wrap items-start justify-between gap-2 border-b px-4 py-3'>
@@ -181,7 +182,7 @@ export function Section({ title, description, actions, children, className }: { 
         </div>
         {actions}
       </header>
-      <div className='p-4'>{children}</div>
+      <div className={cn(!flush && 'p-4')}>{children}</div>
     </section>
   )
 }
@@ -200,13 +201,14 @@ export function DeviceIcon({ kind, className }: { kind: DeviceKind; className?: 
 }
 
 // Ảnh đại diện bằng chữ cái đầu. Màu theo thứ tự tài khoản (cố định), chỉ để dễ nhận ra; tên luôn hiện bên cạnh.
+// Chỉ dùng tông lạnh/trung tính: không trùng màu trạng thái (vàng chờ, cam, đỏ quá hạn, xanh lá xong).
 const AVATAR_TONES = [
   'bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-200',
   'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200',
   'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200',
-  'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
-  'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200',
-  'bg-lime-100 text-lime-900 dark:bg-lime-950 dark:text-lime-200',
+  'bg-indigo-100 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-200',
+  'bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200',
+  'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-200',
 ]
 
 export function UserAvatar({ id, className }: { id?: string; className?: string }) {

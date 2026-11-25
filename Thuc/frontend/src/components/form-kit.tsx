@@ -21,7 +21,8 @@ export function Field({
   error?: string | false
   required?: boolean
   className?: string
-  children: (id: string, describedBy?: string) => React.ReactNode
+  // invalid: truyền vào aria-invalid để ô lỗi có viền đỏ và trình đọc màn hình báo lỗi.
+  children: (id: string, describedBy?: string, invalid?: boolean) => React.ReactNode
 }) {
   const id = useId()
   const hintId = hint ? `${id}-hint` : undefined
@@ -32,7 +33,7 @@ export function Field({
         {label}
         {required && <span className='text-destructive'>*</span>}
       </Label>
-      {children(id, [hintId, errId].filter(Boolean).join(' ') || undefined)}
+      {children(id, [hintId, errId].filter(Boolean).join(' ') || undefined, error ? true : undefined)}
       {hint && !error && (
         <p id={hintId} className='text-muted-foreground text-xs'>
           {hint}
@@ -52,12 +53,16 @@ export function NativeSelect({ className, ...p }: React.ComponentProps<'select'>
     <select
       {...p}
       className={cn(
-        'border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-9 w-full rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:opacity-50 aria-invalid:border-destructive',
+        'border-input dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 h-9 w-full rounded-md border bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
         className
       )}
     />
   )
 }
+
+// Lựa chọn dạng thẻ (label bọc RadioGroupItem): cả thẻ bấm được, thẻ đang chọn viền màu chính.
+export const radioCardClass =
+  'hover:bg-accent/40 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent/40 flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm transition-colors has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50'
 
 export function SubmitButton({ pending, children, pendingText, ...p }: React.ComponentProps<typeof Button> & { pending?: boolean; pendingText?: string }) {
   return (
@@ -106,7 +111,7 @@ export function FormDialog({ open, onOpenChange, title, description, children, f
 export function FormSheet({ open, onOpenChange, title, description, children, footer, onSubmit }: Shell) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className='flex w-full flex-col gap-0 sm:max-w-2xl'>
+      <SheetContent className='bg-card flex w-full flex-col gap-0 sm:max-w-2xl'>
         <form
           noValidate
           onSubmit={(e) => {
@@ -115,12 +120,12 @@ export function FormSheet({ open, onOpenChange, title, description, children, fo
           }}
           className='flex min-h-0 flex-1 flex-col'
         >
-          <SheetHeader className='border-b'>
+          <SheetHeader className='border-b pe-12'>
             <SheetTitle>{title}</SheetTitle>
             {description && <SheetDescription>{description}</SheetDescription>}
           </SheetHeader>
-          <div className='grid flex-1 content-start gap-5 overflow-y-auto p-4'>{children}</div>
-          <SheetFooter className='flex-row justify-end border-t'>{footer}</SheetFooter>
+          <div className='grid min-h-0 flex-1 content-start gap-5 overflow-y-auto p-4'>{children}</div>
+          <SheetFooter className='bg-muted/40 flex-row justify-end border-t'>{footer}</SheetFooter>
         </form>
       </SheetContent>
     </Sheet>

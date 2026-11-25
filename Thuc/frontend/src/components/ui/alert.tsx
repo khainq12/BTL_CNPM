@@ -10,6 +10,9 @@ const alertVariants = cva(
         default: 'bg-card text-card-foreground',
         destructive:
           'text-destructive bg-card [&>svg]:text-current *:data-[slot=alert-description]:text-destructive/90',
+        // Cảnh báo nghiệp vụ (chưa phải lỗi): hổ phách dịu, cùng họ màu với trạng thái chờ.
+        warning:
+          'border-amber-300 bg-amber-50 text-amber-950 *:data-[slot=alert-description]:text-amber-900 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-100 dark:*:data-[slot=alert-description]:text-amber-200/90',
       },
     },
     defaultVariants: {

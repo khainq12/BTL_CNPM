@@ -207,7 +207,7 @@ function Stepper({ c }: { c: WarrantyCase }) {
               </span>
               <span className={cn('px-1 leading-tight', cur ? 'text-foreground font-semibold' : done ? 'text-foreground' : 'text-muted-foreground')}>{s.label}</span>
               {(done || cur) && entered[i] && (
-                <time dateTime={entered[i].at} title={`Vào bước lúc ${fmtDateTime(entered[i].at)}${entered[i].by ? `, ${name(entered[i].by)}` : ''}`} className='text-muted-foreground -mt-1 text-[11px] tabular-nums'>
+                <time dateTime={entered[i].at} title={`Vào bước lúc ${fmtDateTime(entered[i].at)}${entered[i].by ? `, ${name(entered[i].by)}` : ''}`} className='text-muted-foreground -mt-1 text-xs tabular-nums'>
                   {fmtDayMonth(entered[i].at)}
                 </time>
               )}

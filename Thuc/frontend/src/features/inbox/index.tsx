@@ -11,6 +11,7 @@ import { openPause, SLA_RANK, slaInfo, waitingForParts } from '@/domain/sla'
 import type { WarrantyCase } from '@/domain/types'
 import { canSeeCustomer } from '@/features/cases/logic'
 import { openChange } from '@/domain/plan-change'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { CaseLink, DeviceIcon, Empty, PageShell, Pill, SlaBadge, StatusBadge } from '@/components/woms'
 
@@ -24,10 +25,10 @@ const FOCUS_MATCH: Record<Focus, (c: WarrantyCase) => boolean> = {
   soon: (c) => slaInfo(c).kind === 'soon',
   paused: (c) => slaInfo(c).kind === 'paused',
 }
-const TILES: { key: Focus; label: string; icon: typeof ListTodo; tone: string }[] = [
+const TILES: { key: Focus; label: string; icon: typeof ListTodo; tone: string; num?: string }[] = [
   { key: 'all', label: 'Việc đang chờ bạn', icon: ListTodo, tone: 'text-primary' },
-  { key: 'overdue', label: 'Quá hạn', icon: ClockAlert, tone: 'text-red-600 dark:text-red-400' },
-  { key: 'soon', label: 'Sắp quá hạn', icon: AlarmClock, tone: 'text-amber-600 dark:text-amber-400' },
+  { key: 'overdue', label: 'Quá hạn', icon: ClockAlert, tone: 'text-red-600 dark:text-red-400', num: 'text-red-700 dark:text-red-400' },
+  { key: 'soon', label: 'Sắp quá hạn', icon: AlarmClock, tone: 'text-amber-600 dark:text-amber-400', num: 'text-amber-700 dark:text-amber-400' },
   { key: 'paused', label: 'Đang tạm dừng', icon: CirclePause, tone: 'text-slate-500 dark:text-slate-400' },
 ]
 const FOCUS_EMPTY: Record<Focus, string> = {
@@ -158,7 +159,7 @@ export function Inbox() {
                 <t.icon className={cn('size-4', n > 0 ? t.tone : 'text-muted-foreground')} aria-hidden />
                 {t.label}
               </span>
-              <span className={cn('text-3xl font-semibold tracking-tight tabular-nums', n === 0 && 'text-muted-foreground/70')}>{n}</span>
+              <span className={cn('text-3xl font-semibold tracking-tight tabular-nums', n === 0 ? 'text-muted-foreground/70' : t.num)}>{n}</span>
             </button>
           )
         })}
@@ -194,12 +195,14 @@ export function Inbox() {
         {filled.length === 0 && <Empty className='bg-card rounded-lg border'>{FOCUS_EMPTY[focus]}</Empty>}
         {quiet.length > 0 && (
           <section aria-label='Mục không có việc' className='text-muted-foreground border-t pt-4 text-sm'>
-            <h2 className='text-foreground mb-1 font-medium'>
+            <h2 className='text-foreground mb-2 font-medium'>
               {focus === 'all' ? `Không có việc ở ${quiet.length} mục` : `Không có phiếu ${TILES.find((t) => t.key === focus)!.label.toLowerCase()} ở ${quiet.length} mục`}
             </h2>
-            <ul className='flex flex-wrap gap-x-5 gap-y-1'>
+            <ul className='flex flex-wrap gap-1.5'>
               {quiet.map((x) => (
-                <li key={x.title}>{x.title}</li>
+                <li key={x.title} className='bg-muted/70 rounded-md px-2.5 py-1 text-xs'>
+                  {x.title}
+                </li>
               ))}
             </ul>
           </section>
@@ -210,7 +213,11 @@ export function Inbox() {
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
-  return <div className='rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800 dark:bg-amber-950'>{children}</div>
+  return (
+    <Alert variant='warning' role='status'>
+      <AlertDescription className='block'>{children}</AlertDescription>
+    </Alert>
+  )
 }
 
 function QueueBlock({ q, showCustomer }: { q: Queue; showCustomer: boolean }) {
@@ -237,7 +244,7 @@ function QueueBlock({ q, showCustomer }: { q: Queue; showCustomer: boolean }) {
             const cu = db.customers.find((x) => x.id === c.customerId)!
             const d = db.devices.find((x) => x.id === c.deviceId)!
             return (
-              <div key={c.id} className='hover:bg-accent/30 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm transition-colors lg:grid lg:grid-cols-[10.5rem_minmax(0,1fr)_14rem_8rem_6.5rem]'>
+              <div key={c.id} className='hover:bg-accent/30 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm transition-colors lg:grid lg:grid-cols-[10.5rem_minmax(0,1fr)_13.5rem_10.5rem_7.5rem]'>
                 <CaseLink c={c} />
                 <div className='flex min-w-48 flex-1 items-center gap-2.5'>
                   <DeviceIcon kind={d.kind} />
@@ -251,7 +258,7 @@ function QueueBlock({ q, showCustomer }: { q: Queue; showCustomer: boolean }) {
                   {c.status === 'QUOTED' && since(c.quotes.at(-1)?.sentAt) >= PARAMS.quoteWaitDays && <Pill tone='wait'>Gọi lại khách</Pill>}
                 </div>
                 <SlaBadge c={c} />
-                <time dateTime={lastEventAt(c)} title={`Cập nhật ${fmtDateTime(lastEventAt(c))}`} className='text-muted-foreground text-xs lg:text-right'>
+                <time dateTime={lastEventAt(c)} title={`Cập nhật ${fmtDateTime(lastEventAt(c))}`} className='text-muted-foreground text-xs tabular-nums lg:text-right'>
                   {fmtAgo(lastEventAt(c))}
                 </time>
               </div>

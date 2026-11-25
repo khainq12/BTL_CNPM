@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
 import { currentPlan, openChange } from '@/domain/plan-change'
@@ -6,12 +8,14 @@ import { fmtDateTime, fmtMinutes, fmtMoney } from '@/domain/format'
 import { PARAMS } from '@/domain/params'
 import { CONFIRM_METHODS } from '@/domain/rules'
 import type { PlanChange, WarrantyCase, WorkOrder } from '@/domain/types'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
-import { CancelButton, Field, FormDialog, FormSheet, NativeSelect, SubmitButton } from '@/components/form-kit'
+import { CancelButton, Field, FormDialog, FormSheet, NativeSelect, SubmitButton, radioCardClass } from '@/components/form-kit'
 import { InfoList, Pill, Section, useName } from '@/components/woms'
 import { PartRows, QuoteBuilder, TaskRows, quoteTotal, untouchedRowsRemoved, type PartRow, type QuoteItem, type TaskRow } from './editors'
+import { QuoteLines } from './quote-table'
 
 // Đổi phương án khi đang sửa (BR-12): KTV đề xuất → CSKH xét lại bảo hành/báo giá → (quản lý duyệt nếu vượt ngưỡng)
 // → khách xác nhận lại. Trong lúc chờ, KTV tạm ngừng công việc.
@@ -38,8 +42,13 @@ function ChangeSummary({ ch }: { ch: PlanChange }) {
         ['Phương án mới', ch.newPlan],
         ['Công việc thêm', ch.addTasks.map((t) => `${t.title} (${fmtMinutes(t.minutes)})`).join('; ') || 'Không'],
         ['Linh kiện thêm', ch.addParts.map((p) => `${db.parts.find((x) => x.id === p.partId)?.name} × ${p.qty}`).join('; ') || 'Không'],
-        ['Tiền công ước tính', ch.extraLabor ? fmtMoney(ch.extraLabor) : '—'],
-        ['Đề xuất', `${name(ch.proposedBy)} · ${fmtDateTime(ch.proposedAt)}`],
+        ['Tiền công ước tính', <span className='tabular-nums'>{ch.extraLabor ? fmtMoney(ch.extraLabor) : '—'}</span>],
+        [
+          'Đề xuất',
+          <>
+            {name(ch.proposedBy)} · <span className='tabular-nums'>{fmtDateTime(ch.proposedAt)}</span>
+          </>,
+        ],
       ]}
     />
   )
@@ -111,15 +120,15 @@ function Propose({ c, onClose }: P) {
         <span className='font-medium'>Phương án hiện hành:</span> {currentPlan(c) || '—'}
       </p>
       <Field label='Lỗi mới phát hiện' required error={tried && errs.finding}>
-        {(id) => <Textarea id={id} rows={2} value={finding} onChange={(e) => setFinding(e.target.value)} placeholder='Khi thay bàn phím phát hiện cáp màn hình bị đứt một phần' />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={finding} onChange={(e) => setFinding(e.target.value)} placeholder='VD: Khi thay bàn phím phát hiện cáp màn hình bị đứt một phần' />}
       </Field>
       <Field label='Phương án đề xuất' required error={tried && errs.plan}>
-        {(id) => <Textarea id={id} rows={2} value={plan} onChange={(e) => setPlan(e.target.value)} />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={plan} onChange={(e) => setPlan(e.target.value)} />}
       </Field>
-      <TaskRows label='Công việc bổ sung' value={tasks} onChange={setTasks} placeholder='Thay cáp màn hình' error={tried && errs.work} />
+      <TaskRows label='Công việc bổ sung' value={tasks} onChange={setTasks} placeholder='VD: Thay cáp màn hình' error={tried && errs.work} />
       <PartRows label='Linh kiện bổ sung' value={parts} onChange={setParts} />
       <Field label='Tiền công phát sinh ước tính' hint='Để 0 nếu không phát sinh. CSKH dùng để lập báo giá bổ sung.'>
-        {(id) => <Input id={id} type='number' min={0} step={10000} value={labor} onChange={(e) => setLabor(Number(e.target.value))} className='w-48' />}
+        {(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} type='number' min={0} step={10000} value={labor} onChange={(e) => setLabor(Number(e.target.value))} className='w-48 tabular-nums' />}
       </Field>
     </FormSheet>
   )
@@ -163,7 +172,12 @@ function Review({ c, onClose }: P) {
       }
     >
       <ChangeSummary ch={ch} />
-      {rejected && <p className='text-sm font-medium'>Quản lý đã từ chối báo giá bổ sung trước. Lập lại báo giá hoặc chọn hướng khác.</p>}
+      {rejected && (
+        <Alert variant='warning'>
+          <AlertTriangle />
+          <AlertDescription>Quản lý đã từ chối báo giá bổ sung trước. Lập lại báo giá hoặc chọn hướng khác.</AlertDescription>
+        </Alert>
+      )}
       <RadioGroup value={result} onValueChange={(v) => setResult(v as typeof result)} className='gap-2'>
         {(
           [
@@ -172,14 +186,14 @@ function Review({ c, onClose }: P) {
             ['KHONG_DONG_Y', 'Không chấp nhận, tiếp tục phương án cũ'],
           ] as const
         ).map(([k, label]) => (
-          <label key={k} className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+          <label key={k} className={cn(radioCardClass, 'items-center gap-2')}>
             <RadioGroupItem value={k} />
             {label}
           </label>
         ))}
       </RadioGroup>
       <Field label='Căn cứ' required error={tried && !note.trim() && 'Ghi căn cứ kết luận.'}>
-        {(id) => <Textarea id={id} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
       {result === 'CO_PHI' && <QuoteBuilder title={`Báo giá bổ sung v${c.quotes.length + 1}`} items={items} onItems={setItems} labor={labor} onLabor={setLabor} />}
       {result === 'CO_PHI' && (
@@ -198,6 +212,7 @@ function SendQuote({ c, onClose }: P) {
     <FormDialog
       open
       onOpenChange={onClose}
+      wide
       title={`Gửi báo giá bổ sung v${q.version}`}
       description={`Quản lý đã duyệt. Từ lúc gửi, thời hạn xử lý tạm dừng tối đa ${PARAMS.pauseQuoteMaxDays} ngày làm việc (PARAM-16).`}
       onSubmit={() => m.mutate([me, c.id, c.version])}
@@ -208,7 +223,7 @@ function SendQuote({ c, onClose }: P) {
         </>
       }
     >
-      <p className='text-lg font-semibold tabular-nums'>{fmtMoney(q.total)}</p>
+      <QuoteLines items={q.items} labor={q.labor} total={q.total} />
     </FormDialog>
   )
 }
@@ -241,26 +256,26 @@ function Response({ c, onClose }: P) {
       }
     >
       <RadioGroup value={accepted} onValueChange={(v) => setAccepted(v as 'yes' | 'no')} className='grid-cols-2'>
-        <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+        <label className={cn(radioCardClass, 'items-center gap-2')}>
           <RadioGroupItem value='yes' /> Khách đồng ý
         </label>
-        <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+        <label className={cn(radioCardClass, 'items-center gap-2')}>
           <RadioGroupItem value='no' /> Khách từ chối
         </label>
       </RadioGroup>
       {accepted === 'no' && (
         <RadioGroup value={next} onValueChange={(v) => setNext(v as typeof next)} className='gap-2'>
-          <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+          <label className={cn(radioCardClass, 'items-center gap-2')}>
             <RadioGroupItem value='TIEP_TUC' /> Tiếp tục sửa theo phương án cũ
           </label>
-          <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+          <label className={cn(radioCardClass, 'items-center gap-2')}>
             <RadioGroupItem value='TRA_MAY' /> Dừng sửa, chuẩn bị trả thiết bị
           </label>
         </RadioGroup>
       )}
       <Field label='Phương thức xác nhận' required error={tried && !method && 'Chọn phương thức khách xác nhận.'}>
-        {(id) => (
-          <NativeSelect id={id} value={method} onChange={(e) => setMethod(e.target.value)}>
+        {(id, desc, invalid) => (
+          <NativeSelect id={id} aria-describedby={desc} aria-invalid={invalid} value={method} onChange={(e) => setMethod(e.target.value)}>
             <option value=''>Chọn phương thức</option>
             {CONFIRM_METHODS.map((x) => (
               <option key={x}>{x}</option>
@@ -268,7 +283,7 @@ function Response({ c, onClose }: P) {
           </NativeSelect>
         )}
       </Field>
-      <Field label='Ghi chú'>{(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} placeholder='Mã OTP, số phiếu ký, thời điểm gọi...' />}</Field>
+      <Field label='Ghi chú'>{(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} value={note} onChange={(e) => setNote(e.target.value)} placeholder='Mã OTP, số phiếu ký, thời điểm gọi...' />}</Field>
     </FormDialog>
   )
 }

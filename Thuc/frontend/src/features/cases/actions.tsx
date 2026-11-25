@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
 import { currentPlan } from '@/domain/plan-change'
@@ -23,12 +24,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Textarea } from '@/components/ui/textarea'
-import { CancelButton, Field, FormDialog, FormSheet, NativeSelect, SubmitButton } from '@/components/form-kit'
-import { InfoList } from '@/components/woms'
+import { CancelButton, Field, FormDialog, FormSheet, NativeSelect, SubmitButton, radioCardClass } from '@/components/form-kit'
+import { InfoList, Pill } from '@/components/woms'
 import { PartRows, QuoteBuilder, TaskRows, quoteTotal, untouchedRowsRemoved } from './editors'
 import { techLoad, type ActionKey } from './logic'
 import { PlanChangeDialog } from './plan-change'
 import { PhotoPicker } from './photo-picker'
+import { QuoteLines } from './quote-table'
 
 type P = { c: WarrantyCase; wo?: WorkOrder; onClose: () => void }
 
@@ -67,7 +69,7 @@ function AcceptOnline({ c, onClose }: P) {
       }
     >
       <Field label='Tình trạng bên ngoài' required error={tried && errs.condition}>
-        {(id) => <Textarea id={id} rows={2} value={condition} onChange={(e) => setCondition(e.target.value)} placeholder='Trầy góc trái nắp máy, đủ phím.' />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={condition} onChange={(e) => setCondition(e.target.value)} placeholder='VD: Trầy góc trái nắp máy, đủ phím.' />}
       </Field>
       <AccessoryPicker value={acc} onChange={setAcc} none={none} onNone={setNone} error={tried && errs.acc} />
       <PhotoPicker value={photos} onChange={setPhotos} error={tried && errs.photos} />
@@ -127,7 +129,7 @@ function CancelRequest({ c, onClose }: P) {
       }
     >
       <Field label='Lý do hủy' required error={tried && !reason.trim() && 'Ghi lý do hủy.'}>
-        {(id) => <Textarea id={id} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder='Khách đổi ý, mang máy về...' />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} placeholder='VD: Khách đổi ý, mang máy về...' />}
       </Field>
     </FormDialog>
   )
@@ -160,15 +162,15 @@ function Precheck({ c, onClose }: P) {
     >
       <InfoList
         rows={[
-          ['Serial', <span className='font-mono'>{device.serial}</span>],
-          ['Ngày mua', device.purchaseDate ? new Date(device.purchaseDate).toLocaleDateString('vi-VN') : 'Chưa có chứng từ'],
-          ['Thời hạn', `${device.warrantyMonths} tháng (${device.policyCode})`],
-          ['Hết hạn', end ? end.toLocaleDateString('vi-VN') : '—'],
+          ['Serial', <span className='font-mono tabular-nums'>{device.serial}</span>],
+          ['Ngày mua', <span className='tabular-nums'>{device.purchaseDate ? new Date(device.purchaseDate).toLocaleDateString('vi-VN') : 'Chưa có chứng từ'}</span>],
+          ['Thời hạn', <span className='tabular-nums'>{`${device.warrantyMonths} tháng (${device.policyCode})`}</span>],
+          ['Hết hạn', <span className='tabular-nums'>{end ? end.toLocaleDateString('vi-VN') : '—'}</span>],
         ]}
       />
       <Field label='Kết quả đối chiếu' hint={`Hệ thống gợi ý: ${WARRANTY_CHECK_LABEL[auto]}. Không tìm thấy serial thì chọn "Chưa đủ thông tin", không tự kết luận hết hạn (C05).`}>
-        {(id) => (
-          <NativeSelect id={id} value={warranty} onChange={(e) => setWarranty(e.target.value as WarrantyCheck)}>
+        {(id, desc, invalid) => (
+          <NativeSelect id={id} aria-describedby={desc} aria-invalid={invalid} value={warranty} onChange={(e) => setWarranty(e.target.value as WarrantyCheck)}>
             {Object.entries(WARRANTY_CHECK_LABEL).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
@@ -177,7 +179,7 @@ function Precheck({ c, onClose }: P) {
           </NativeSelect>
         )}
       </Field>
-      <Field label='Ghi chú'>{(id) => <Textarea id={id} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />}</Field>
+      <Field label='Ghi chú'>{(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />}</Field>
     </FormDialog>
   )
 }
@@ -202,15 +204,15 @@ function RequestInfo({ c, onClose }: P) {
       }
     >
       <Field label='Thông tin cần bổ sung'>
-        {(id) => (
-          <NativeSelect id={id} value={reason} onChange={(e) => setReason(e.target.value)}>
+        {(id, desc, invalid) => (
+          <NativeSelect id={id} aria-describedby={desc} aria-invalid={invalid} value={reason} onChange={(e) => setReason(e.target.value)}>
             {INFO_REQUEST_REASONS.map((r) => (
               <option key={r}>{r}</option>
             ))}
           </NativeSelect>
         )}
       </Field>
-      <Field label='Chi tiết cho khách (không bắt buộc)'>{(id) => <Textarea id={id} rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} />}</Field>
+      <Field label='Chi tiết cho khách (không bắt buộc)'>{(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} />}</Field>
     </FormDialog>
   )
 }
@@ -238,7 +240,7 @@ function InfoSupplied({ c, onClose }: P) {
       }
     >
       <Field label='Khách đã cung cấp gì' required error={tried && !note.trim() && 'Ghi rõ thông tin đã nhận.'}>
-        {(id) => <Textarea id={id} rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder='Đã nhận ảnh hóa đơn ngày 02/03/2026, khớp serial.' />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder='VD: Đã nhận ảnh hóa đơn ngày 02/03/2026, khớp serial.' />}
       </Field>
     </FormDialog>
   )
@@ -279,13 +281,13 @@ function Assign({ c, wo, onClose, kind }: P & { kind: 'diagnosis' | 'repair' }) 
         {techs.map((t) => {
           const l = techLoad(db, t.id)
           return (
-            <label key={t.id} className='has-[[data-state=checked]]:border-primary flex items-center gap-3 rounded-md border p-3 text-sm'>
+            <label key={t.id} className={cn(radioCardClass, 'items-center')}>
               <RadioGroupItem value={t.id} disabled={t.id === current} />
               <span className='flex-1'>
                 {t.name}
                 {t.id === current && <span className='text-muted-foreground'> (đang phụ trách)</span>}
               </span>
-              <span className={l.overloaded ? 'font-medium text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}>
+              <span className={cn('tabular-nums', l.overloaded ? 'font-medium text-amber-700 dark:text-amber-400' : 'text-muted-foreground')}>
                 {l.wo} WO · {l.diag} chẩn đoán
               </span>
             </label>
@@ -293,15 +295,15 @@ function Assign({ c, wo, onClose, kind }: P & { kind: 'diagnosis' | 'repair' }) 
         })}
       </RadioGroup>
       {load?.overloaded && (
-        <Alert>
+        <Alert variant='warning'>
           <AlertTriangle />
           <AlertTitle>Kỹ thuật viên đang quá tải</AlertTitle>
-          <AlertDescription>Đang có {load.total} việc dở dang (ngưỡng {PARAMS.technicianOverload}). Cân nhắc giao người khác.</AlertDescription>
+          <AlertDescription className='tabular-nums'>Đang có {load.total} việc dở dang (ngưỡng {PARAMS.technicianOverload}). Cân nhắc giao người khác.</AlertDescription>
         </Alert>
       )}
       {needReason && (
         <Field label='Lý do đổi người' required error={tried && !reason.trim() && 'Đổi người phụ trách phải ghi lý do (BR-11).'}>
-          {(id) => <Input id={id} value={reason} onChange={(e) => setReason(e.target.value)} placeholder='Kỹ thuật viên nghỉ phép, cần người có chuyên môn máy in...' />}
+          {(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} value={reason} onChange={(e) => setReason(e.target.value)} placeholder='VD: Kỹ thuật viên nghỉ phép, cần người có chuyên môn máy in...' />}
         </Field>
       )}
     </FormDialog>
@@ -351,8 +353,8 @@ function Diagnosis({ c, onClose }: P) {
       </p>
       <div className='grid gap-4 sm:grid-cols-2'>
         <Field label='Phân loại nguyên nhân'>
-          {(id) => (
-            <NativeSelect id={id} value={causeType} onChange={(e) => setCauseType(e.target.value as CauseType)}>
+          {(id, desc, invalid) => (
+            <NativeSelect id={id} aria-describedby={desc} aria-invalid={invalid} value={causeType} onChange={(e) => setCauseType(e.target.value as CauseType)}>
               {Object.entries(CAUSE_LABEL).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
@@ -362,8 +364,8 @@ function Diagnosis({ c, onClose }: P) {
           )}
         </Field>
         <Field label='Mức độ'>
-          {(id) => (
-            <NativeSelect id={id} value={severity} onChange={(e) => setSeverity(e.target.value as typeof severity)}>
+          {(id, desc, invalid) => (
+            <NativeSelect id={id} aria-describedby={desc} aria-invalid={invalid} value={severity} onChange={(e) => setSeverity(e.target.value as typeof severity)}>
               <option value='NHE'>Nhẹ</option>
               <option value='TRUNG_BINH'>Trung bình</option>
               <option value='NANG'>Nặng</option>
@@ -372,7 +374,7 @@ function Diagnosis({ c, onClose }: P) {
         </Field>
       </div>
       <Field label='Nguyên nhân lỗi' required error={tried && errs.cause} hint='Ghi bằng chứng nếu lỗi do rơi vỡ, vào nước, tự tháo lắp (AT-03).'>
-        {(id) => <Textarea id={id} rows={3} value={cause} onChange={(e) => setCause(e.target.value)} />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={3} value={cause} onChange={(e) => setCause(e.target.value)} />}
       </Field>
       <label className='flex items-center gap-2 text-sm font-medium'>
         <Checkbox checked={!repairable} onCheckedChange={(v) => setRepairable(v !== true)} />
@@ -381,12 +383,12 @@ function Diagnosis({ c, onClose }: P) {
       {repairable && (
         <>
           <Field label='Phương án sửa' required error={tried && errs.plan}>
-            {(id) => <Textarea id={id} rows={2} value={plan} onChange={(e) => setPlan(e.target.value)} />}
+            {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={plan} onChange={(e) => setPlan(e.target.value)} />}
           </Field>
           <TaskRows label='Công việc dự kiến' value={tasks} onChange={setTasks} error={tried && errs.tasks} />
           <PartRows label='Linh kiện dự kiến' value={parts} onChange={setParts} />
           <Field label='Tiền công ước tính (nếu sửa có phí)' hint='Để 0 nếu dự kiến bảo hành miễn phí.'>
-            {(id) => <Input id={id} type='number' min={0} step={10000} value={labor} onChange={(e) => setLabor(Number(e.target.value))} className='w-48' />}
+            {(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} type='number' min={0} step={10000} value={labor} onChange={(e) => setLabor(Number(e.target.value))} className='w-48 tabular-nums' />}
           </Field>
         </>
       )}
@@ -421,6 +423,8 @@ function Eligibility({ c, onClose }: P) {
   const [tried, setTried] = useState(false)
   const m = useCaseAction(api.decideEligibility, 'Đã lưu kết luận bảo hành', onClose)
   const total = quoteTotal(items, labor)
+  const quoteRejected = c.quotes.at(-1)?.status === 'TU_CHOI_DUYET'
+  const hasWarnNotice = !d.repairable || exceptionDone === false || quoteRejected
   return (
     <FormSheet
       open
@@ -448,14 +452,24 @@ function Eligibility({ c, onClose }: P) {
         <p>
           <span className='font-medium'>Chẩn đoán:</span> {CAUSE_LABEL[d.causeType]}. {d.cause}
         </p>
-        {!d.repairable && <p className='font-medium'>Kỹ thuật viên kết luận không sửa được tại trung tâm.</p>}
-        {exceptionDone !== undefined && <p className='font-medium'>Quản lý đã {exceptionDone ? 'duyệt' : 'từ chối'} đề nghị ngoại lệ.</p>}
-        {c.quotes.at(-1)?.status === 'TU_CHOI_DUYET' && <p className='font-medium'>Báo giá trước bị quản lý từ chối. Lập báo giá mới hoặc chọn hướng khác.</p>}
+        {exceptionDone === true && <p className='font-medium'>Quản lý đã duyệt đề nghị ngoại lệ.</p>}
       </div>
+      {hasWarnNotice && (
+        <Alert variant='warning'>
+          <AlertTriangle />
+          <AlertDescription>
+            {!d.repairable && <p>Kỹ thuật viên kết luận không sửa được tại trung tâm.</p>}
+            {exceptionDone === false && <p>Quản lý đã từ chối đề nghị ngoại lệ.</p>}
+            {quoteRejected && <p>Báo giá trước bị quản lý từ chối. Lập báo giá mới hoặc chọn hướng khác.</p>}
+          </AlertDescription>
+        </Alert>
+      )}
       <Field label='Quy tắc áp dụng' hint={`Gợi ý theo dữ liệu: ${suggested}. Có thể chọn khác nếu có căn cứ.`}>
-        {(id) => (
+        {(id, desc, invalid) => (
           <NativeSelect
             id={id}
+            aria-describedby={desc}
+            aria-invalid={invalid}
             value={rule}
             onChange={(e) => {
               setRule(e.target.value)
@@ -475,7 +489,7 @@ function Eligibility({ c, onClose }: P) {
         <legend className='mb-1 text-sm font-medium'>Kết luận</legend>
         <RadioGroup value={decision} onValueChange={(v) => setDecision(v as EligibilityDecision)} className='gap-2 sm:grid-cols-2'>
           {(Object.keys(DECISION_LABEL) as EligibilityDecision[]).map((k) => (
-            <label key={k} className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm has-[:disabled]:opacity-50'>
+            <label key={k} className={cn(radioCardClass, 'items-center gap-2')}>
               <RadioGroupItem value={k} disabled={!allowed.includes(k)} />
               {DECISION_LABEL[k]}
             </label>
@@ -483,7 +497,7 @@ function Eligibility({ c, onClose }: P) {
         </RadioGroup>
       </fieldset>
       <Field label='Lý do, căn cứ' required error={tried && !reason.trim() && 'Ghi lý do kết luận (BR-05).'}>
-        {(id) => <Textarea id={id} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />}
       </Field>
       {decision === 'CO_PHI' && <QuoteBuilder title={`Báo giá v${c.quotes.length + 1}`} items={items} onItems={setItems} labor={labor} onLabor={setLabor} />}
     </FormSheet>
@@ -498,6 +512,7 @@ function SendQuote({ c, onClose }: P) {
     <FormDialog
       open
       onOpenChange={onClose}
+      wide
       title={`Gửi báo giá v${q.version} cho khách`}
       description='Báo giá đã được quản lý duyệt. Khách xác nhận qua Customer Portal hoặc tại quầy.'
       onSubmit={() => m.mutate([me, c.id, c.version])}
@@ -508,7 +523,7 @@ function SendQuote({ c, onClose }: P) {
         </>
       }
     >
-      <p className='text-lg font-semibold tabular-nums'>{fmtMoney(q.total)}</p>
+      <QuoteLines items={q.items} labor={q.labor} total={q.total} />
     </FormDialog>
   )
 }
@@ -539,16 +554,16 @@ function QuoteResponse({ c, onClose }: P) {
       }
     >
       <RadioGroup value={accepted} onValueChange={(v) => setAccepted(v as 'yes' | 'no')} className='grid-cols-2'>
-        <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+        <label className={cn(radioCardClass, 'items-center gap-2')}>
           <RadioGroupItem value='yes' /> Khách đồng ý sửa
         </label>
-        <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+        <label className={cn(radioCardClass, 'items-center gap-2')}>
           <RadioGroupItem value='no' /> Khách từ chối
         </label>
       </RadioGroup>
       <Field label='Phương thức xác nhận' required error={tried && !method && 'Chọn phương thức khách xác nhận.'}>
-        {(id) => (
-          <NativeSelect id={id} value={method} onChange={(e) => setMethod(e.target.value)}>
+        {(id, desc, invalid) => (
+          <NativeSelect id={id} aria-describedby={desc} aria-invalid={invalid} value={method} onChange={(e) => setMethod(e.target.value)}>
             <option value=''>Chọn phương thức</option>
             {CONFIRM_METHODS.map((x) => (
               <option key={x}>{x}</option>
@@ -556,7 +571,7 @@ function QuoteResponse({ c, onClose }: P) {
           </NativeSelect>
         )}
       </Field>
-      <Field label='Ghi chú'>{(id) => <Input id={id} value={note} onChange={(e) => setNote(e.target.value)} placeholder='Mã OTP, số phiếu ký, thời điểm gọi...' />}</Field>
+      <Field label='Ghi chú'>{(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} value={note} onChange={(e) => setNote(e.target.value)} placeholder='Mã OTP, số phiếu ký, thời điểm gọi...' />}</Field>
       {accepted === 'no' && <p className='text-muted-foreground text-sm'>Phiếu chuyển sang "Chuẩn bị trả không sửa". Có thể thu phí kiểm tra nếu khách đã đồng ý trước (PARAM-07).</p>}
     </FormDialog>
   )
@@ -586,7 +601,7 @@ function ReturnConfirm({ c, onClose }: P) {
       }
     >
       <Field label='Kết luận gửi khách' required error={tried && !text.trim() && 'Ghi kết luận.'}>
-        {(id) => <Textarea id={id} rows={3} value={text} onChange={(e) => setText(e.target.value)} />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={3} value={text} onChange={(e) => setText(e.target.value)} />}
       </Field>
       <label className='flex items-center gap-2 text-sm'>
         <Checkbox checked={fee} onCheckedChange={(v) => setFee(v === true)} />
@@ -601,6 +616,12 @@ function ReturnConfirm({ c, onClose }: P) {
 function StartRepair({ c, wo, onClose }: P) {
   const me = useMe()
   const m = useCaseAction(api.startRepair, 'Đã bắt đầu sửa', onClose)
+  const lastDefect = c.qc.at(-1)?.defect
+  const rows: [ReactNode, ReactNode][] = [
+    ['Lệnh sửa chữa', <span className='font-mono tabular-nums'>{wo?.code ?? '—'}</span>],
+    ['Số công việc', <span className='tabular-nums'>{wo?.tasks.length ?? 0} đầu việc</span>],
+  ]
+  if (c.status === 'REWORK') rows.push(['Lỗi QC gần nhất', lastDefect || '—'])
   return (
     <FormDialog
       open
@@ -615,7 +636,9 @@ function StartRepair({ c, wo, onClose }: P) {
         </>
       }
     >
-      <span />
+      <div className='bg-muted/50 rounded-md border p-3'>
+        <InfoList rows={rows} />
+      </div>
     </FormDialog>
   )
 }
@@ -647,11 +670,11 @@ function FinishRepair({ c, wo, onClose }: P) {
         const max = remaining(p)
         return (
           <Field key={p.partId} label={`${part.name} (đã nhận ${max})`}>
-            {(id) => <Input id={id} type='number' min={0} max={max} className='w-24' value={used[p.partId]} onChange={(e) => setUsed({ ...used, [p.partId]: Math.min(max, Math.max(0, Number(e.target.value))) })} />}
+            {(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} type='number' min={0} max={max} className='w-24 tabular-nums' value={used[p.partId]} onChange={(e) => setUsed({ ...used, [p.partId]: Math.min(max, Math.max(0, Number(e.target.value))) })} />}
           </Field>
         )
       })}
-      <Field label='Ghi chú kết quả sửa'>{(id) => <Textarea id={id} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />}</Field>
+      <Field label='Ghi chú kết quả sửa'>{(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={note} onChange={(e) => setNote(e.target.value)} />}</Field>
     </FormDialog>
   )
 }
@@ -668,6 +691,8 @@ function Qc({ c, onClose }: P) {
   const [tried, setTried] = useState(false)
   const m = useCaseAction(api.submitQc, 'Đã lưu kết quả kiểm tra', onClose)
   const pass = items.every((i) => !i.mandatory || i.pass)
+  const mandatoryTotal = items.filter((i) => i.mandatory).length
+  const mandatoryPassed = items.filter((i) => i.mandatory && i.pass).length
   const last = c.reworkCount >= PARAMS.maxRework
   return (
     <FormSheet
@@ -696,32 +721,45 @@ function Qc({ c, onClose }: P) {
         {c.reworkCount > 0 && (
           <>
             <br />
-            <span className='font-medium'>Đã sửa lại:</span> {c.reworkCount}/{PARAMS.maxRework} lần
+            <span className='font-medium'>Đã sửa lại:</span> <span className='tabular-nums'>{c.reworkCount}/{PARAMS.maxRework}</span> lần
           </>
         )}
       </p>
-      <ul className='grid gap-2'>
-        {items.map((it, i) => (
-          <li key={it.label} className='grid gap-2 rounded-md border p-3'>
-            <label className='flex items-center gap-2 text-sm'>
-              <Checkbox checked={it.pass} onCheckedChange={(v) => setItems(items.map((x, j) => (j === i ? { ...x, pass: v === true } : x)))} />
-              <span className='flex-1'>{it.label}</span>
-              <span className='text-muted-foreground text-xs'>{it.mandatory ? 'Bắt buộc' : 'Không bắt buộc'}</span>
-            </label>
-            {!it.pass && <Input aria-label={`Ghi chú: ${it.label}`} placeholder='Ghi chú nếu không đạt' value={it.note} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)))} />}
-          </li>
-        ))}
-      </ul>
+      <div className='grid gap-2'>
+        <p className='text-muted-foreground text-xs font-medium tabular-nums'>
+          Bắt buộc đạt {mandatoryPassed}/{mandatoryTotal}
+        </p>
+        <ul className='grid gap-2'>
+          {items.map((it, i) => (
+            <li key={it.label} className='grid gap-2 rounded-md border p-3'>
+              <label className='flex cursor-pointer items-center gap-2 text-sm'>
+                <Checkbox checked={it.pass} onCheckedChange={(v) => setItems(items.map((x, j) => (j === i ? { ...x, pass: v === true } : x)))} />
+                <span className='flex-1'>{it.label}</span>
+                {it.mandatory ? <Pill tone='neutral'>Bắt buộc</Pill> : <span className='text-muted-foreground text-xs'>Không bắt buộc</span>}
+              </label>
+              {!it.pass && (
+                <Input
+                  aria-label={`Ghi chú: ${it.label}`}
+                  placeholder='Ghi chú nếu không đạt'
+                  className='bg-muted/30 h-8 text-xs'
+                  value={it.note}
+                  onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)))}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
       {!pass && (
         <Field label='Lỗi còn tồn tại' required error={tried && !defect.trim() && 'Mô tả lỗi để kỹ thuật viên xử lý lại.'}>
-          {(id) => <Textarea id={id} rows={2} value={defect} onChange={(e) => setDefect(e.target.value)} />}
+          {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={defect} onChange={(e) => setDefect(e.target.value)} />}
         </Field>
       )}
       <PhotoPicker label='Ảnh kết quả kiểm tra' required={false} max={4} hint='Không bắt buộc. Chụp khi cần chứng minh tình trạng sau kiểm tra, tối đa 4 ảnh.' value={photos} onChange={setPhotos} />
       {!pass && last && (
-        <Alert>
+        <Alert variant='warning'>
           <AlertTriangle />
-          <AlertDescription>Đã sửa lại {c.reworkCount} lần. Lần này không đạt sẽ chuyển quản lý quyết định, không tự động đổi máy (BR-22, C13).</AlertDescription>
+          <AlertDescription className='tabular-nums'>Đã sửa lại {c.reworkCount} lần. Lần này không đạt sẽ chuyển quản lý quyết định, không tự động đổi máy (BR-22, C13).</AlertDescription>
         </Alert>
       )}
     </FormSheet>
@@ -766,43 +804,53 @@ function Handover({ c, onClose }: P) {
       }
     >
       <RadioGroup value={relation} onValueChange={(v) => setRelation(v as typeof relation)} className='grid-cols-2'>
-        <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+        <label className={cn(radioCardClass, 'items-center gap-2')}>
           <RadioGroupItem value='CHINH_CHU' /> Chính chủ
         </label>
-        <label className='has-[[data-state=checked]]:border-primary flex items-center gap-2 rounded-md border p-3 text-sm'>
+        <label className={cn(radioCardClass, 'items-center gap-2')}>
           <RadioGroupItem value='NHAN_HO' /> Người nhận hộ
         </label>
       </RadioGroup>
       <div className='grid gap-4 sm:grid-cols-2'>
         <Field label='Họ tên người nhận' required error={tried && errs.name}>
-          {(id) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} />}
+          {(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} value={name} onChange={(e) => setName(e.target.value)} />}
         </Field>
-        <Field label='Số điện thoại'>{(id) => <Input id={id} value={phone} onChange={(e) => setPhone(e.target.value)} />}</Field>
+        <Field label='Số điện thoại'>{(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} className='tabular-nums' value={phone} onChange={(e) => setPhone(e.target.value)} />}</Field>
       </div>
       <Field label='Xác thực người nhận' required error={tried && errs.id} hint={relation === 'NHAN_HO' ? 'Nhận hộ: ghi giấy ủy quyền hoặc xác nhận qua điện thoại chủ máy.' : 'Ví dụ: đối chiếu biên nhận gốc, CCCD.'}>
-        {(id) => <Input id={id} value={idNote} onChange={(e) => setIdNote(e.target.value)} />}
+        {(id, desc, invalid) => <Input id={id} aria-describedby={desc} aria-invalid={invalid} value={idNote} onChange={(e) => setIdNote(e.target.value)} />}
       </Field>
-      <fieldset className='grid gap-2 rounded-md border p-3'>
-        <legend className='px-1 text-sm font-medium'>Đối chiếu với lúc tiếp nhận</legend>
-        <p className='text-muted-foreground text-sm'>
-          Phụ kiện lúc nhận: {c.noAccessories ? 'Không có phụ kiện' : c.accessories.join(', ')}. Tình trạng: {c.condition || '—'}
-        </p>
-        <label className='flex items-center gap-2 text-sm'>
-          <Checkbox checked={accOk} onCheckedChange={(v) => setAccOk(v === true)} /> Đã trả đủ phụ kiện
-        </label>
-        <label className='flex items-center gap-2 text-sm'>
-          <Checkbox checked={condOk} onCheckedChange={(v) => setCondOk(v === true)} /> Khách đã kiểm tra thiết bị cùng nhân viên
-        </label>
-        <label className='flex items-center gap-2 text-sm'>
-          <Checkbox checked={signed} onCheckedChange={(v) => setSigned(v === true)} /> Người nhận đã ký biên bản bàn giao
-        </label>
-        {tried && errs.checks && <p className='text-destructive text-xs'>{errs.checks}</p>}
+      <fieldset className='grid gap-2'>
+        <legend className={cn('mb-1 text-sm font-medium', tried && errs.checks && 'text-destructive')}>Đối chiếu với lúc tiếp nhận</legend>
+        <div className={cn('grid gap-2 rounded-md border p-3', tried && errs.checks && 'border-destructive')}>
+          <p className='text-muted-foreground text-sm'>
+            Phụ kiện lúc nhận: {c.noAccessories ? 'Không có phụ kiện' : c.accessories.join(', ')}. Tình trạng: {c.condition || '—'}
+          </p>
+          <label className='flex items-center gap-2 text-sm'>
+            <Checkbox checked={accOk} onCheckedChange={(v) => setAccOk(v === true)} /> Đã trả đủ phụ kiện
+          </label>
+          <label className='flex items-center gap-2 text-sm'>
+            <Checkbox checked={condOk} onCheckedChange={(v) => setCondOk(v === true)} /> Khách đã kiểm tra thiết bị cùng nhân viên
+          </label>
+          <label className='flex items-center gap-2 text-sm'>
+            <Checkbox checked={signed} onCheckedChange={(v) => setSigned(v === true)} /> Người nhận đã ký biên bản bàn giao
+          </label>
+          {tried && errs.checks && <p className='text-destructive text-xs'>{errs.checks}</p>}
+        </div>
       </fieldset>
-      {fee > 0 && <p className='text-sm'>Thu phí kiểm tra: <span className='font-semibold'>{fmtMoney(fee)}</span></p>}
-      {c.quotes.at(-1)?.status === 'KHACH_DONG_Y' && <p className='text-sm'>Thu tiền sửa theo báo giá: <span className='font-semibold'>{fmtMoney(c.quotes.at(-1)!.total)}</span></p>}
+      {fee > 0 && (
+        <p className='bg-accent/50 border-primary/30 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm tabular-nums'>
+          <span>Thu phí kiểm tra:</span> <span className='text-base font-semibold'>{fmtMoney(fee)}</span>
+        </p>
+      )}
+      {c.quotes.at(-1)?.status === 'KHACH_DONG_Y' && (
+        <p className='bg-accent/50 border-primary/30 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm tabular-nums'>
+          <span>Thu tiền sửa theo báo giá:</span> <span className='text-base font-semibold'>{fmtMoney(c.quotes.at(-1)!.total)}</span>
+        </p>
+      )}
       <Field label='Khách đánh giá (không bắt buộc)'>
-        {(id) => (
-          <NativeSelect id={id} value={rating ?? ''} onChange={(e) => setRating(e.target.value ? Number(e.target.value) : undefined)} className='w-48'>
+        {(id, desc, invalid) => (
+          <NativeSelect id={id} aria-describedby={desc} aria-invalid={invalid} value={rating ?? ''} onChange={(e) => setRating(e.target.value ? Number(e.target.value) : undefined)} className='w-48'>
             <option value=''>Khách chưa đánh giá</option>
             {[5, 4, 3, 2, 1].map((n) => (
               <option key={n} value={n}>
@@ -812,7 +860,7 @@ function Handover({ c, onClose }: P) {
           </NativeSelect>
         )}
       </Field>
-      <Field label='Góp ý của khách'>{(id) => <Textarea id={id} rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} />}</Field>
+      <Field label='Góp ý của khách'>{(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={2} value={feedback} onChange={(e) => setFeedback(e.target.value)} />}</Field>
     </FormSheet>
   )
 }
@@ -839,7 +887,7 @@ function Complaint({ c, onClose }: P) {
       }
     >
       <Field label='Nội dung khiếu nại' required error={tried && !content.trim() && 'Nhập nội dung.'}>
-        {(id) => <Textarea id={id} rows={4} value={content} onChange={(e) => setContent(e.target.value)} />}
+        {(id, desc, invalid) => <Textarea id={id} aria-describedby={desc} aria-invalid={invalid} rows={4} value={content} onChange={(e) => setContent(e.target.value)} />}
       </Field>
     </FormDialog>
   )

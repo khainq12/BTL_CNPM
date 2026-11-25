@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Check, Circle } from 'lucide-react'
+import { Check, CircleX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
@@ -10,16 +10,17 @@ import { CAUSE_LABEL, DECISION_LABEL, DEVICE_KIND_LABEL, WARRANTY_CHECK_LABEL } 
 import { slaInfo } from '@/domain/sla'
 import { CASE_STATUS, STAGES } from '@/domain/statuses'
 import type { WarrantyCase, WorkOrder } from '@/domain/types'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DeviceIcon, Empty, Guard, InfoList, PageShell, Pill, Section, SlaMeter, StatusBadge, UserAvatar, useName } from '@/components/woms'
 import { WoParts } from '@/features/inventory/wo-parts'
 import { ActionDialog } from './actions'
 import { PhotoGallery } from './photo-picker'
 import { CHANGE_STATUS, PlanChangeList } from './plan-change'
+import { QuoteLines } from './quote-table'
 import { canSeeCustomer, canViewCase, nextActions, type ActionKey } from './logic'
 
 export function CaseDetail({ id }: { id: string }) {
@@ -29,6 +30,9 @@ export function CaseDetail({ id }: { id: string }) {
     </Guard>
   )
 }
+
+// Nút đề nghị hủy: viền và chữ màu cảnh báo để không lẫn với thao tác thường.
+const CANCEL_TONE = 'text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/5'
 
 function Detail({ id }: { id: string }) {
   const db = useDb()
@@ -67,15 +71,15 @@ function Detail({ id }: { id: string }) {
         </span>
       }
       description={`${DEVICE_KIND_LABEL[dev.kind]} ${dev.brand} ${dev.model}${canSeeCustomer(me) ? ` · ${cu.name}` : ''}`}
-      crumbs={[{ label: me.role === 'KTV' ? 'Việc của tôi' : 'Danh sách phiếu', to: me.role === 'KTV' ? '/viec-cua-toi' : me.role === 'KHO' ? '/kho/yeu-cau' : me.role === 'QC' ? '/kiem-dinh' : '/phieu' }, { label: c.code }]}
+      crumbs={[{ label: me.role === 'KTV' ? 'Việc của tôi' : me.role === 'KHO' ? 'Yêu cầu linh kiện' : me.role === 'QC' ? 'Chờ kiểm tra chất lượng' : 'Danh sách phiếu', to: me.role === 'KTV' ? '/viec-cua-toi' : me.role === 'KHO' ? '/kho/yeu-cau' : me.role === 'QC' ? '/kiem-dinh' : '/phieu' }, { label: c.code }]}
     >
       <Stepper c={c} />
 
       <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start'>
         <Tabs id='case-tabs' value={tab} onValueChange={setTab} className='min-w-0 scroll-mt-20'>
-          <div className='no-scrollbar overflow-x-auto'>
-            <TabsList>
-              <TabsTrigger value='overview'>Tổng quan</TabsTrigger>
+          <div className='overflow-x-auto border-b'>
+            <TabsList className='h-auto w-max justify-start gap-0.5 rounded-none bg-transparent p-0'>
+              <Tab value='overview' label='Tổng quan' />
               <Tab value='diag' label='Chẩn đoán' empty={!c.diagnosis} />
               <Tab value='warranty' label='Bảo hành và báo giá' empty={!c.eligibility && !c.quotes.length} count={c.quotes.length} />
               <Tab value='wo' label='Lệnh sửa chữa' empty={!wo} />
@@ -108,7 +112,7 @@ function Detail({ id }: { id: string }) {
         </Tabs>
 
         <aside className='order-first grid gap-4 lg:sticky lg:top-20 lg:order-none'>
-          <Section title='Việc cần làm'>
+          <Section title='Việc cần làm' className={cn(actions.length === 0 && 'bg-muted/30')}>
             {actions.length === 0 ? (
               <p className='text-muted-foreground text-sm'>
                 {change
@@ -125,27 +129,20 @@ function Detail({ id }: { id: string }) {
                       <Link to='/phe-duyet'>{a.label}</Link>
                     </Button>
                   ) : a.disabled ? (
-                    <Tooltip key={a.key}>
-                      <TooltipTrigger asChild>
-                        <span tabIndex={0} className='grid'>
-                          <Button variant={a.primary ? 'default' : 'outline'} disabled>
-                            {a.label}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{a.disabled}</TooltipContent>
-                    </Tooltip>
+                    <div key={a.key} className='grid gap-1'>
+                      <Button variant={a.primary ? 'default' : 'outline'} disabled aria-describedby={`${a.key}-why`} className={cn(a.key === 'cancel' && CANCEL_TONE)}>
+                        {a.label}
+                      </Button>
+                      <p id={`${a.key}-why`} className='text-muted-foreground text-xs'>
+                        {a.disabled}
+                      </p>
+                    </div>
                   ) : (
-                    <Button key={a.key} variant={a.primary ? 'default' : 'outline'} onClick={() => (a.key === 'warehouse' ? openParts() : setAction(a.key))}>
+                    <Button key={a.key} variant={a.primary ? 'default' : 'outline'} className={cn(a.key === 'cancel' && CANCEL_TONE)} onClick={() => (a.key === 'warehouse' ? openParts() : setAction(a.key))}>
                       {a.label}
                     </Button>
                   )
                 )}
-                {actions.filter((a) => a.disabled).map((a) => (
-                  <p key={a.key + 'r'} className='text-muted-foreground text-xs'>
-                    {a.label}: {a.disabled}
-                  </p>
-                ))}
               </div>
             )}
           </Section>
@@ -169,10 +166,16 @@ function Detail({ id }: { id: string }) {
   )
 }
 
-// Thẻ có dữ liệu thì đậm, chưa có thì mờ (vẫn bấm được); số lần nếu có nhiều bản ghi.
+// Thẻ kiểu gạch chân. Thẻ có dữ liệu chữ đậm hơn thẻ chưa có (vẫn bấm được); số lần nếu có nhiều bản ghi.
 function Tab({ value, label, empty, count }: { value: string; label: string; empty?: boolean; count?: number }) {
   return (
-    <TabsTrigger value={value} className={cn(empty && 'text-muted-foreground/70')}>
+    <TabsTrigger
+      value={value}
+      className={cn(
+        'hover:text-foreground data-[state=active]:text-foreground data-[state=active]:after:bg-primary focus-visible:ring-inset focus-visible:outline-none data-[state=active]:font-medium dark:data-[state=active]:text-foreground relative h-10 flex-none rounded-none border-0 bg-transparent px-2 after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full data-[state=active]:bg-transparent data-[state=active]:shadow-none dark:data-[state=active]:border-0 dark:data-[state=active]:bg-transparent',
+        empty ? 'text-muted-foreground font-normal' : 'text-foreground/80 dark:text-foreground/80'
+      )}
+    >
       {label}
       {count ? <span className='bg-muted text-muted-foreground rounded-full px-1.5 text-[11px] leading-4 tabular-nums'>{count}</span> : null}
     </TabsTrigger>
@@ -184,8 +187,15 @@ function Stepper({ c }: { c: WarrantyCase }) {
   const idx = STAGES.findIndex((s) => s.statuses.includes(c.status))
   // Lúc phiếu vào mỗi bước: lần đầu chuyển sang một trạng thái của bước đó (bước đầu là lúc tạo phiếu).
   const entered = STAGES.map((s, i) => (i === 0 ? { at: c.createdAt, by: c.receivedBy } : c.events.find((e) => e.to && s.statuses.includes(e.to))))
-  if (c.status === 'CANCELLED') return <p className='text-muted-foreground text-sm'>Phiếu đã hủy: {c.cancelReason}</p>
+  if (c.status === 'CANCELLED')
+    return (
+      <div className='bg-muted/60 rounded-xl border px-4 py-3 text-sm'>
+        <span className='font-medium'>Phiếu đã hủy:</span> {c.cancelReason}
+      </div>
+    )
   const finished = c.status === 'COMPLETED'
+  // Bước hiện tại mang màu của trạng thái khi phiếu đang chờ, vướng hay phải làm lại; bình thường dùng màu chính.
+  const curTone = { wait: 'border-amber-500 text-amber-700 ring-amber-500/20 dark:text-amber-300', warn: 'border-orange-500 text-orange-700 ring-orange-500/20 dark:text-orange-300', bad: 'border-red-500 text-red-700 ring-red-500/20 dark:text-red-300' }[CASE_STATUS[c.status].tone as string] ?? 'border-primary text-primary ring-primary/20'
   return (
     <div className='bg-card overflow-x-auto rounded-xl border px-4 py-3'>
       <ol className='grid min-w-[44rem] grid-cols-8' aria-label='Tiến trình phiếu'>
@@ -199,7 +209,7 @@ function Stepper({ c }: { c: WarrantyCase }) {
                 className={cn(
                   'relative z-10 flex size-6 items-center justify-center rounded-full border-2 text-[11px] font-semibold tabular-nums',
                   done && 'border-primary bg-primary text-primary-foreground',
-                  cur && 'border-primary bg-card text-primary ring-primary/20 ring-4',
+                  cur && cn('bg-card ring-4', curTone),
                   !done && !cur && 'border-border bg-card text-muted-foreground'
                 )}
               >
@@ -229,9 +239,11 @@ function Overview({ c }: { c: WarrantyCase }) {
   return (
     <>
       {c.infoRequest && (
-        <div className='rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950'>
-          <span className='font-medium'>Đang chờ khách bổ sung:</span> {c.infoRequest}
-        </div>
+        <Alert variant='warning' role='status'>
+          <AlertDescription className='block'>
+            <span className='font-medium'>Đang chờ khách bổ sung:</span> {c.infoRequest}
+          </AlertDescription>
+        </Alert>
       )}
       <div className='grid gap-4 md:grid-cols-2'>
         <Section title='Thiết bị'>
@@ -289,8 +301,36 @@ function DiagnosisTab({ c }: { c: WarrantyCase }) {
           ['Mức độ', { NHE: 'Nhẹ', TRUNG_BINH: 'Trung bình', NANG: 'Nặng' }[d.severity]],
           ['Sửa được', d.repairable ? 'Có' : 'Không sửa được tại trung tâm'],
           ['Phương án', d.plan || '—'],
-          ['Công việc', d.tasks.map((t) => `${t.title} (${fmtMinutes(t.minutes)})`).join('; ') || '—'],
-          ['Linh kiện', d.parts.map((p) => `${db.parts.find((x) => x.id === p.partId)?.name} × ${p.qty}`).join('; ') || 'Không cần'],
+          [
+            'Công việc',
+            d.tasks.length ? (
+              <ul className='grid gap-1'>
+                {d.tasks.map((t, k) => (
+                  <li key={k} className='flex justify-between gap-3'>
+                    <span>{t.title}</span>
+                    <span className='text-muted-foreground shrink-0 tabular-nums'>{fmtMinutes(t.minutes)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              '—'
+            ),
+          ],
+          [
+            'Linh kiện',
+            d.parts.length ? (
+              <ul className='grid gap-1'>
+                {d.parts.map((p, k) => (
+                  <li key={k} className='flex justify-between gap-3'>
+                    <span>{db.parts.find((x) => x.id === p.partId)?.name}</span>
+                    <span className='text-muted-foreground shrink-0 tabular-nums'>× {p.qty}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              'Không cần'
+            ),
+          ],
         ]}
       />
     </Section>
@@ -325,26 +365,7 @@ function WarrantyTab({ c }: { c: WarrantyCase }) {
         .reverse()
         .map((q) => (
           <Section key={q.version} title={q.planChangeNo ? `Báo giá bổ sung v${q.version} (đổi phương án #${q.planChangeNo})` : `Báo giá v${q.version}`} actions={<Pill tone={QUOTE_STATUS[q.status][1]}>{QUOTE_STATUS[q.status][0]}</Pill>}>
-            <table className='w-full text-sm'>
-              <tbody>
-                {q.items.map((i, k) => (
-                  <tr key={k} className='border-b'>
-                    <td className='py-1.5'>{i.label}</td>
-                    <td className='py-1.5 text-right tabular-nums'>
-                      {i.qty} × {fmtMoney(i.unitPrice)}
-                    </td>
-                  </tr>
-                ))}
-                <tr className='border-b'>
-                  <td className='py-1.5'>Tiền công</td>
-                  <td className='py-1.5 text-right tabular-nums'>{fmtMoney(q.labor)}</td>
-                </tr>
-                <tr>
-                  <td className='py-1.5 font-semibold'>Tổng</td>
-                  <td className='py-1.5 text-right font-semibold tabular-nums'>{fmtMoney(q.total)}</td>
-                </tr>
-              </tbody>
-            </table>
+            <QuoteLines items={q.items} labor={q.labor} total={q.total} />
             {q.confirmMethod && (
               <p className='text-muted-foreground mt-2 text-sm'>
                 Xác nhận: {q.confirmMethod}
@@ -366,18 +387,35 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
   const mine = me.role === 'KTV' && wo.technicianId === me.id && c.status === 'IN_REPAIR'
   return (
     <div className='grid gap-4'>
-      <Section title={`${wo.code}`} description={`Kỹ thuật viên: ${name(wo.technicianId)} · Lập ${fmtDateTime(wo.createdAt)}${wo.startedAt ? ` · Bắt đầu ${fmtDateTime(wo.startedAt)}` : ''}`}>
+      <Section
+        title={<span className='tabular-nums'>{wo.code}</span>}
+        actions={
+          <Pill tone={wo.tasks.length && wo.tasks.every((t) => t.done) ? 'done' : 'neutral'}>
+            <span className='tabular-nums'>
+              {wo.tasks.filter((t) => t.done).length}/{wo.tasks.length}
+            </span>{' '}
+            việc xong
+          </Pill>
+        }
+        description={`Kỹ thuật viên: ${name(wo.technicianId)} · Lập ${fmtDateTime(wo.createdAt)}${wo.startedAt ? ` · Bắt đầu ${fmtDateTime(wo.startedAt)}` : ''}`}>
         <p className='mb-3 text-sm'>
           <span className='text-muted-foreground'>Phương án hiện hành: </span>
           {currentPlan(c) || '—'}
         </p>
-        {mine && openChange(c) && <p className='mb-3 text-sm font-medium'>Đang chờ xác nhận đổi phương án, tạm ngừng đánh dấu công việc (BR-12).</p>}
-        <ul className='grid gap-2'>
+        {mine && openChange(c) && (
+          <Alert variant='warning' role='status' className='mb-3'>
+            <AlertDescription>Đang chờ xác nhận đổi phương án, tạm ngừng đánh dấu công việc (BR-12).</AlertDescription>
+          </Alert>
+        )}
+        <ul className='-mx-2 grid gap-0.5'>
           {wo.tasks.map((t) => (
-            <li key={t.id} className='flex items-center gap-3 text-sm'>
-              <Checkbox checked={t.done} disabled={!mine || !!openChange(c) || toggle.isPending} onCheckedChange={() => toggle.mutate([me, wo.id, t.id])} aria-label={t.title} />
-              <span className={cn('flex-1', t.done && 'text-muted-foreground line-through')}>{t.title}</span>
-              <span className='text-muted-foreground text-xs'>{fmtMinutes(t.minutes)}</span>
+            <li key={t.id}>
+              {/* Cả dòng bấm được để đánh dấu, không cần nhắm đúng ô 16px. */}
+              <label className='hover:bg-accent/40 flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-sm has-[:disabled]:cursor-default has-[:disabled]:hover:bg-transparent'>
+                <Checkbox checked={t.done} disabled={!mine || !!openChange(c) || toggle.isPending} onCheckedChange={() => toggle.mutate([me, wo.id, t.id])} aria-label={t.title} />
+                <span className={cn('flex-1', t.done && 'text-muted-foreground line-through')}>{t.title}</span>
+                <span className='text-muted-foreground text-xs tabular-nums'>{fmtMinutes(t.minutes)}</span>
+              </label>
             </li>
           ))}
         </ul>
@@ -397,7 +435,7 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
               if (log.trim()) addLog.mutate([me, wo.id, log], { onSuccess: () => setLog('') })
             }}
           >
-            <Input aria-label='Ghi nhật ký' value={log} onChange={(e) => setLog(e.target.value)} placeholder='Đã thay keo tản nhiệt, nhiệt độ ổn định 65°C' />
+            <Input aria-label='Ghi nhật ký' value={log} onChange={(e) => setLog(e.target.value)} placeholder='VD: Đã thay keo tản nhiệt, nhiệt độ ổn định 65°C' />
             <Button type='submit' variant='outline' disabled={addLog.isPending}>
               Ghi
             </Button>
@@ -406,12 +444,12 @@ function WoTab({ c, wo }: { c: WarrantyCase; wo: WorkOrder }) {
         {wo.logs.length === 0 ? (
           <p className='text-muted-foreground text-sm'>Chưa có ghi chép.</p>
         ) : (
-          <ul className='grid gap-2 text-sm'>
+          <ul className='grid divide-y text-sm'>
             {wo.logs
               .slice()
               .reverse()
               .map((l, i) => (
-                <li key={i}>
+                <li key={i} className='py-2 first:pt-0 last:pb-0'>
                   {l.text}
                   <div className='text-muted-foreground text-xs'>
                     {name(l.by)} · {fmtDateTime(l.at)}
@@ -448,7 +486,7 @@ function QcTab({ c }: { c: WarrantyCase }) {
         .reverse()
         .map((q) => (
           <Section key={q.round} title={`Lần ${q.round}`} description={`${name(q.by)} · ${fmtDateTime(q.at)}`} actions={<Pill tone={q.pass ? 'done' : 'bad'}>{q.pass ? 'Đạt' : 'Không đạt'}</Pill>}>
-            {q.defect && <p className='mb-2 text-sm'>Lỗi còn tồn tại: {q.defect}</p>}
+            {q.defect && <p className='border-destructive/30 bg-destructive/5 text-destructive mb-3 rounded-md border px-3 py-2 text-sm'>Lỗi còn tồn tại: {q.defect}</p>}
             {q.photos?.length ? (
               <div className='mb-3'>
                 <PhotoGallery photos={q.photos} />
@@ -457,7 +495,7 @@ function QcTab({ c }: { c: WarrantyCase }) {
             <ul className='grid gap-1 text-sm'>
               {q.items.map((i) => (
                 <li key={i.label} className='flex gap-2'>
-                  {i.pass ? <Check className='mt-0.5 size-4 text-emerald-600' aria-label='Đạt' /> : <Circle className='text-destructive mt-0.5 size-4' aria-label='Không đạt' />}
+                  {i.pass ? <Check className='mt-0.5 size-4 text-emerald-600' aria-label='Đạt' /> : <CircleX className='text-destructive mt-0.5 size-4' aria-label='Không đạt' />}
                   <span>
                     {i.label}
                     {i.note && <span className='text-muted-foreground'> · {i.note}</span>}
@@ -519,7 +557,7 @@ function HistoryTab({ c }: { c: WarrantyCase }) {
                   {time(e.at)}
                 </time>
                 <span className='relative flex justify-center' aria-hidden>
-                  {i < events.length - 1 && <span className='bg-muted-foreground/30 absolute top-4 -bottom-4 w-px' />}
+                  {i < events.length - 1 && day(events[i + 1].at) === day(e.at) && <span className='bg-muted-foreground/30 absolute top-4 -bottom-4 w-px' />}
                   <span className={cn('mt-1 size-2.5 rounded-full ring-4 ring-card', e.to ? 'bg-primary' : 'bg-muted-foreground/50')} />
                 </span>
                 <div className='grid gap-0.5 text-sm'>

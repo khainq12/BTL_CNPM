@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ImageIcon, ImagePlus, Loader2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Photo } from '@/domain/types'
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 
 // Ảnh hiện trạng và ảnh kiểm tra.
@@ -87,7 +88,7 @@ export function PhotoPicker({
             <button type='button' className='size-full' onClick={() => setView(i)} aria-label={`Xem ảnh ${i + 1}`}>
               <Thumb photo={p} />
             </button>
-            <button type='button' aria-label={`Xóa ảnh ${i + 1}`} onClick={() => onChange(value.filter((_, j) => j !== i))} className='bg-background/90 absolute end-1 top-1 rounded-full p-0.5 shadow-sm'>
+            <button type='button' aria-label={`Xóa ảnh ${i + 1}`} onClick={() => onChange(value.filter((_, j) => j !== i))} className='bg-background/90 hover:bg-background focus-visible:ring-ring/50 absolute end-1 top-1 flex size-6 items-center justify-center rounded-full border shadow-sm outline-none focus-visible:ring-[3px]'>
               <X className='size-3.5' />
             </button>
           </div>
@@ -128,7 +129,7 @@ function Thumb({ photo }: { photo: Photo }) {
   ) : (
     // Dữ liệu mẫu chỉ có tên tệp, chưa có ảnh: hiện khung giữ chỗ kèm tên để vẫn đối chiếu được.
     <span className='bg-accent/50 text-accent-foreground flex size-full flex-col items-center justify-center gap-1 bg-[repeating-linear-gradient(135deg,transparent_0_6px,var(--accent)_6px_7px)] p-1 text-center text-xs leading-tight [overflow-wrap:anywhere]' title='Dữ liệu mẫu chỉ có tên tệp'>
-      <ImageIcon className='size-5 opacity-70' aria-hidden />
+      <ImageIcon className='size-5 shrink-0 opacity-70' aria-hidden />
       {photo.name.replace(/\.[a-z]+$/i, '')}
     </span>
   )
@@ -149,13 +150,14 @@ function PhotoViewer({ photos, index, onIndex }: { photos: Photo[]; index: numbe
           <p className='text-muted-foreground text-sm'>Ảnh mẫu "{p?.name}" chỉ có tên tệp, không có nội dung.</p>
         )}
         {photos.length > 1 && (
-          <div className='flex justify-between gap-2'>
-            <button type='button' className='text-sm underline underline-offset-4 disabled:opacity-40' disabled={index === 0} onClick={() => onIndex(index! - 1)}>
+          <div className='flex items-center justify-between gap-2'>
+            <Button type='button' variant='outline' size='sm' disabled={index === 0} onClick={() => onIndex(index! - 1)}>
               Ảnh trước
-            </button>
-            <button type='button' className='text-sm underline underline-offset-4 disabled:opacity-40' disabled={index === photos.length - 1} onClick={() => onIndex(index! + 1)}>
+            </Button>
+            <span className='text-muted-foreground min-w-0 truncate text-xs'>{p?.name}</span>
+            <Button type='button' variant='outline' size='sm' disabled={index === photos.length - 1} onClick={() => onIndex(index! + 1)}>
               Ảnh sau
-            </button>
+            </Button>
           </div>
         )}
       </DialogContent>
@@ -171,7 +173,7 @@ export function PhotoGallery({ photos }: { photos: Photo[] }) {
     <>
       <div className='flex flex-wrap gap-2'>
         {photos.map((p, i) => (
-          <button key={i} type='button' onClick={() => setView(i)} className='focus-visible:ring-ring/50 size-16 overflow-hidden rounded-md border outline-none focus-visible:ring-[3px]' aria-label={`Xem ảnh ${i + 1}: ${p.name}`}>
+          <button key={i} type='button' onClick={() => setView(i)} className='focus-visible:ring-ring/50 size-20 overflow-hidden rounded-md border outline-none focus-visible:ring-[3px]' aria-label={`Xem ảnh ${i + 1}: ${p.name}`}>
             <Thumb photo={p} />
           </button>
         ))}

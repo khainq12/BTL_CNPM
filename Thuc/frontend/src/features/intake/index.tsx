@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, Check, Circle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useAction, useDb, useMe } from '@/api/hooks'
 import * as api from '@/api/service'
 import { DEVICE_KIND_LABEL } from '@/domain/rules'
@@ -178,13 +179,13 @@ function Intake() {
         <div className='grid gap-6'>
           <Section title='Khách hàng' description='Tìm theo số điện thoại. Không tra cứu khách chỉ bằng serial (BR-11).'>
             <div className='grid gap-4'>
-              <div className='flex flex-wrap items-start gap-2'>
-                <Field label='Số điện thoại' required error={show(errs.phone)} className='w-full max-w-72'>
-                  {(id, d) => (
+              <Field label='Số điện thoại' required error={show(errs.phone)} className='w-full max-w-sm'>
+                {(id, d, invalid) => (
+                  <div className='flex gap-2'>
                     <Input
                       id={id}
                       aria-describedby={d}
-                      aria-invalid={!!show(errs.phone)}
+                      aria-invalid={invalid}
                       inputMode='tel'
                       value={phone}
                       onChange={(e) => {
@@ -207,21 +208,21 @@ function Intake() {
                           find()
                         }
                       }}
-                      placeholder='0912345678'
+                      placeholder='VD: 0912345678'
                     />
-                  )}
-                </Field>
-                <Button type='button' variant='outline' className='mt-[22px]' onClick={find}>
-                  Tìm khách
-                </Button>
-              </div>
-              {looked && <p className='text-muted-foreground text-sm'>{looked === 'found' ? `Khách cũ, có ${db.cases.filter((c) => c.customerId === customerId).length} phiếu trước đây. Thông tin đã điền sẵn.` : 'Chưa có khách với số này. Nhập thông tin để tạo hồ sơ khách mới.'}</p>}
+                    <Button type='button' variant='outline' onClick={find}>
+                      Tìm khách
+                    </Button>
+                  </div>
+                )}
+              </Field>
+              {looked && <p className={cn('rounded-md px-3 py-2 text-sm', looked === 'found' ? 'bg-accent/60 text-accent-foreground' : 'bg-muted/70')}>{looked === 'found' ? `Khách cũ, có ${db.cases.filter((c) => c.customerId === customerId).length} phiếu trước đây. Thông tin đã điền sẵn.` : 'Chưa có khách với số này. Nhập thông tin để tạo hồ sơ khách mới.'}</p>}
               <div className='grid gap-4 sm:grid-cols-2'>
                 <Field label='Họ tên khách' required error={show(errs.name)}>
-                  {(id, d) => <Input id={id} aria-describedby={d} value={name} onChange={(e) => setName(e.target.value)} />}
+                  {(id, d, invalid) => <Input id={id} aria-describedby={d} aria-invalid={invalid} value={name} onChange={(e) => setName(e.target.value)} />}
                 </Field>
                 <Field label='Email' error={show(errs.email)} hint='Không bắt buộc. Dùng để gửi thông báo tiến độ.'>
-                  {(id, d) => <Input id={id} aria-describedby={d} type='email' value={email} onChange={(e) => setEmail(e.target.value)} />}
+                  {(id, d, invalid) => <Input id={id} aria-describedby={d} aria-invalid={invalid} type='email' value={email} onChange={(e) => setEmail(e.target.value)} />}
                 </Field>
               </div>
             </div>
@@ -245,8 +246,8 @@ function Intake() {
               )}
               <div className='grid gap-4 sm:grid-cols-2'>
                 <Field label='Loại thiết bị' required error={show(errs.kind)}>
-                  {(id) => (
-                    <NativeSelect id={id} value={kind} disabled={!!deviceId} onChange={(e) => setKind(e.target.value as DeviceKind)}>
+                  {(id, d, invalid) => (
+                    <NativeSelect id={id} aria-describedby={d} aria-invalid={invalid} value={kind} disabled={!!deviceId} className='disabled:bg-muted/50 disabled:opacity-90' onChange={(e) => setKind(e.target.value as DeviceKind)}>
                       <option value=''>Chọn loại</option>
                       {Object.entries(DEVICE_KIND_LABEL).map(([k, v]) => (
                         <option key={k} value={k}>
@@ -257,17 +258,17 @@ function Intake() {
                   )}
                 </Field>
                 <Field label='Hãng' required error={show(errs.brand)}>
-                  {(id) => <Input id={id} value={brand} disabled={!!deviceId} onChange={(e) => setBrand(e.target.value)} placeholder='Dell, HP, Canon...' />}
+                  {(id, d, invalid) => <Input id={id} aria-describedby={d} aria-invalid={invalid} value={brand} disabled={!!deviceId} className='disabled:bg-muted/50 disabled:opacity-90' onChange={(e) => setBrand(e.target.value)} placeholder='VD: Dell, HP, Canon' />}
                 </Field>
                 <Field label='Model' required error={show(errs.model)}>
-                  {(id) => <Input id={id} value={model} disabled={!!deviceId} onChange={(e) => setModel(e.target.value)} placeholder='Latitude 5420' />}
+                  {(id, d, invalid) => <Input id={id} aria-describedby={d} aria-invalid={invalid} value={model} disabled={!!deviceId} className='disabled:bg-muted/50 disabled:opacity-90' onChange={(e) => setModel(e.target.value)} placeholder='VD: Latitude 5420' />}
                 </Field>
                 <Field label='Serial' required error={show(errs.serial) || ownedMsg}>
-                  {(id) => <Input id={id} value={serial} disabled={!!deviceId} className='font-mono uppercase' onChange={(e) => setSerial(e.target.value)} />}
+                  {(id, d, invalid) => <Input id={id} aria-describedby={d} aria-invalid={invalid} value={serial} disabled={!!deviceId} className='font-mono uppercase disabled:bg-muted/50 disabled:opacity-90' onChange={(e) => setSerial(e.target.value)} />}
                 </Field>
               </div>
               {dup && (
-                <Alert>
+                <Alert variant='warning'>
                   <AlertTriangle />
                   <AlertTitle>Serial này đang có phiếu chưa đóng</AlertTitle>
                   <AlertDescription>
@@ -283,14 +284,14 @@ function Intake() {
 
           <Section title='Lỗi khách mô tả'>
             <Field label='Khách báo lỗi gì' required error={show(errs.symptom)} hint='Ghi theo lời khách, chưa phải kết luận kỹ thuật.'>
-              {(id, d) => <Textarea id={id} aria-describedby={d} rows={3} value={symptom} onChange={(e) => setSymptom(e.target.value)} placeholder='Máy không lên nguồn sau khi sạc qua đêm...' />}
+              {(id, d, invalid) => <Textarea id={id} aria-describedby={d} aria-invalid={invalid} rows={3} value={symptom} onChange={(e) => setSymptom(e.target.value)} placeholder='VD: Máy không lên nguồn sau khi sạc qua đêm' />}
             </Field>
           </Section>
 
           <Section title='Tình trạng, phụ kiện và ảnh' description='Dùng để đối chiếu khi bàn giao, tránh tranh chấp (IS-02).'>
             <div className='grid gap-5'>
               <Field label='Tình trạng bên ngoài' required error={show(errs.condition)}>
-                {(id) => <Textarea id={id} rows={2} value={condition} onChange={(e) => setCondition(e.target.value)} placeholder='Trầy góc trái nắp máy, bàn phím đủ phím.' />}
+                {(id, d, invalid) => <Textarea id={id} aria-describedby={d} aria-invalid={invalid} rows={2} value={condition} onChange={(e) => setCondition(e.target.value)} placeholder='VD: Trầy góc trái nắp máy, bàn phím đủ phím' />}
               </Field>
               <AccessoryPicker value={acc} onChange={setAcc} none={none} onNone={setNone} error={show(errs.acc)} />
               <PhotoPicker value={photos} onChange={setPhotos} error={show(errs.photos)} />
@@ -308,8 +309,8 @@ function Intake() {
           <ul className='grid gap-2 text-sm'>
             {checks.map(([l, ok]) => (
               <li key={l} className='flex items-center gap-2'>
-                {ok ? <Check className='size-4 text-emerald-600' aria-hidden /> : <Circle className='text-muted-foreground size-4' aria-hidden />}
-                <span className={ok ? '' : 'text-muted-foreground'}>{l}</span>
+                {ok ? <Check className='size-4 text-emerald-600' aria-hidden /> : <Circle className={cn('size-4', tried ? 'text-destructive' : 'text-muted-foreground')} aria-hidden />}
+                <span className={ok ? '' : tried ? 'text-destructive' : 'text-muted-foreground'}>{l}</span>
                 <span className='sr-only'>{ok ? 'đã đủ' : 'còn thiếu'}</span>
               </li>
             ))}

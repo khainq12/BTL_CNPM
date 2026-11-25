@@ -61,9 +61,7 @@ export const TRANSITIONS: { from: CaseStatus; to: CaseStatus; roles: Role[] | 'H
 ]
 
 export function canTransition(from: CaseStatus, to: CaseStatus, role: Role) {
-  return TRANSITIONS.some(
-    (t) => t.from === from && t.to === to && t.roles !== 'HE_THONG' && t.roles.includes(role)
-  )
+  return TRANSITIONS.some((t) => t.from === from && t.to === to && t.roles !== 'HE_THONG' && t.roles.includes(role))
 }
 
 // Thứ tự hiển thị thanh tiến trình trên chi tiết phiếu.
@@ -78,6 +76,4 @@ export const STAGES: { label: string; statuses: CaseStatus[] }[] = [
   { label: 'Bàn giao', statuses: ['RETURN_PENDING', 'READY_FOR_DELIVERY', 'COMPLETED'] },
 ]
 
-export const OPEN_STATUSES = (Object.keys(CASE_STATUS) as CaseStatus[]).filter(
-  (s) => !['DRAFT', 'COMPLETED', 'CANCELLED'].includes(s)
-)
+export const OPEN_STATUSES = (Object.keys(CASE_STATUS) as CaseStatus[]).filter((s) => !['DRAFT', 'COMPLETED', 'CANCELLED'].includes(s))

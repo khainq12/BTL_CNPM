@@ -1,0 +1,17 @@
+{
+  "name": "@woms/e2e",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Kiểm thử đầu-cuối (Playwright) chạy kịch bản nghiệp vụ trên giao diện thật + API thật",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test --grep @smoke",
+    "report": "playwright show-report ../reports/playwright",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1",
+    "@types/node": "^25.6.0",
+    "typescript": "~6.0.3"
+  }
+}

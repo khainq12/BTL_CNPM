@@ -1,27 +1,11 @@
 import { PARAMS } from '@/domain/params'
 import type { User, WarrantyCase, WorkOrder } from '@/domain/types'
-import type { Db } from '@/mock/db'
+import type { Db } from '@/domain/db'
 import { woNeedsWarehouse } from '@/domain/parts'
 import { openChange } from '@/domain/plan-change'
 
-// Ai được mở chi tiết phiếu (ma trận phân quyền 5.3; AT-14: từ chối kể cả khi biết mã phiếu).
-export function canViewCase(me: User, c: WarrantyCase, wo?: WorkOrder) {
-  switch (me.role) {
-    case 'KTV':
-      return c.diagnosisTechId === me.id || wo?.technicianId === me.id || !!wo?.assignHistory.some((h) => h.to === me.id)
-    case 'KHO':
-      return !!wo
-    case 'QC':
-      return !!wo && (c.status === 'TESTING' || c.qc.some((q) => q.by === me.id))
-    default:
-      return true
-  }
-}
-
-// Thông tin liên hệ khách: KTV, kho, QC không được xem (hàng 1 ma trận 5.3).
-export function canSeeCustomer(me: User) {
-  return ['TN', 'CSKH', 'DP', 'QL'].includes(me.role)
-}
+// Quyền xem phiếu và thông tin khách dùng chung với backend (@woms/domain/access).
+export { canSeeCustomer, canViewCase } from '@/domain/access'
 
 export type ActionKey =
   | 'acceptOnline'

@@ -18,6 +18,7 @@ import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedBanGiaoRouteImport } from './routes/_authenticated/ban-giao'
+import { Route as AuthenticatedBangDieuHanhRouteImport } from './routes/_authenticated/bang-dieu-hanh'
 import { Route as AuthenticatedCaNhanRouteImport } from './routes/_authenticated/ca-nhan'
 import { Route as AuthenticatedDieuPhoiRouteImport } from './routes/_authenticated/dieu-phoi'
 import { Route as AuthenticatedKhieuNaiRouteImport } from './routes/_authenticated/khieu-nai'
@@ -84,6 +85,12 @@ const AuthenticatedBanGiaoRoute = AuthenticatedBanGiaoRouteImport.update({
   path: '/ban-giao',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBangDieuHanhRoute =
+  AuthenticatedBangDieuHanhRouteImport.update({
+    id: '/bang-dieu-hanh',
+    path: '/bang-dieu-hanh',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCaNhanRoute = AuthenticatedCaNhanRouteImport.update({
   id: '/ca-nhan',
   path: '/ca-nhan',
@@ -206,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/ban-giao': typeof AuthenticatedBanGiaoRoute
+  '/bang-dieu-hanh': typeof AuthenticatedBangDieuHanhRoute
   '/ca-nhan': typeof AuthenticatedCaNhanRoute
   '/dieu-phoi': typeof AuthenticatedDieuPhoiRoute
   '/khieu-nai': typeof AuthenticatedKhieuNaiRoute
@@ -236,6 +244,7 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/ban-giao': typeof AuthenticatedBanGiaoRoute
+  '/bang-dieu-hanh': typeof AuthenticatedBangDieuHanhRoute
   '/ca-nhan': typeof AuthenticatedCaNhanRoute
   '/dieu-phoi': typeof AuthenticatedDieuPhoiRoute
   '/khieu-nai': typeof AuthenticatedKhieuNaiRoute
@@ -269,6 +278,7 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/ban-giao': typeof AuthenticatedBanGiaoRoute
+  '/_authenticated/bang-dieu-hanh': typeof AuthenticatedBangDieuHanhRoute
   '/_authenticated/ca-nhan': typeof AuthenticatedCaNhanRoute
   '/_authenticated/dieu-phoi': typeof AuthenticatedDieuPhoiRoute
   '/_authenticated/khieu-nai': typeof AuthenticatedKhieuNaiRoute
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/ban-giao'
+    | '/bang-dieu-hanh'
     | '/ca-nhan'
     | '/dieu-phoi'
     | '/khieu-nai'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/ban-giao'
+    | '/bang-dieu-hanh'
     | '/ca-nhan'
     | '/dieu-phoi'
     | '/khieu-nai'
@@ -365,6 +377,7 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/ban-giao'
+    | '/_authenticated/bang-dieu-hanh'
     | '/_authenticated/ca-nhan'
     | '/_authenticated/dieu-phoi'
     | '/_authenticated/khieu-nai'
@@ -462,6 +475,13 @@ declare module '@tanstack/react-router' {
       path: '/ban-giao'
       fullPath: '/ban-giao'
       preLoaderRoute: typeof AuthenticatedBanGiaoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/bang-dieu-hanh': {
+      id: '/_authenticated/bang-dieu-hanh'
+      path: '/bang-dieu-hanh'
+      fullPath: '/bang-dieu-hanh'
+      preLoaderRoute: typeof AuthenticatedBangDieuHanhRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ca-nhan': {
@@ -616,6 +636,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedBanGiaoRoute: typeof AuthenticatedBanGiaoRoute
+  AuthenticatedBangDieuHanhRoute: typeof AuthenticatedBangDieuHanhRoute
   AuthenticatedCaNhanRoute: typeof AuthenticatedCaNhanRoute
   AuthenticatedDieuPhoiRoute: typeof AuthenticatedDieuPhoiRoute
   AuthenticatedKhieuNaiRoute: typeof AuthenticatedKhieuNaiRoute
@@ -642,6 +663,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBanGiaoRoute: AuthenticatedBanGiaoRoute,
+  AuthenticatedBangDieuHanhRoute: AuthenticatedBangDieuHanhRoute,
   AuthenticatedCaNhanRoute: AuthenticatedCaNhanRoute,
   AuthenticatedDieuPhoiRoute: AuthenticatedDieuPhoiRoute,
   AuthenticatedKhieuNaiRoute: AuthenticatedKhieuNaiRoute,

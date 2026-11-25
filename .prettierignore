@@ -1,0 +1,7 @@
+dist
+node_modules
+reports
+coverage
+apps/staff-web
+apps/portal
+**/*.gen.ts

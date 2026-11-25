@@ -1,0 +1,243 @@
+// Schema PostgreSQL của WOMS (TV4/TV5).
+// Đối chiếu ERD v0.2 và db/reference/01_create_oltp_tables.sql của Nam: giữ các thực thể chính
+// (users, customers, devices, warranty_cases, work_orders, parts, inventory_transactions, case_status_history,
+// audit_logs, approvals), bổ sung bảng hạ tầng (outbox_events, idempotency_keys, notifications, counters).
+// Phần lồng nhau của một ca (chẩn đoán, báo giá, QC, bàn giao, đổi phương án, tạm dừng SLA) lưu JSONB trong cột data
+// để giữ nguyên mô hình miền @woms/domain; các cột tìm kiếm/lọc được tách riêng và đánh chỉ mục.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TN
+  CSKH
+  DP
+  KTV
+  KHO
+  QC
+  QL
+}
+
+model User {
+  id           String   @id
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         Role
+  phone        String   @default("")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("users")
+}
+
+model Customer {
+  id      String   @id
+  name    String
+  phone   String   @unique
+  email   String?
+  devices Device[]
+  cases   WarrantyCase[]
+
+  @@map("customers")
+}
+
+model Device {
+  id             String    @id
+  customerId     String    @map("customer_id")
+  kind           String
+  brand          String
+  model          String
+  serial         String    @unique
+  purchaseDate   DateTime? @map("purchase_date") @db.Timestamptz(3)
+  warrantyMonths Int       @map("warranty_months")
+  policyCode     String    @map("policy_code")
+  customer       Customer  @relation(fields: [customerId], references: [id])
+  cases          WarrantyCase[]
+
+  @@index([customerId])
+  @@map("devices")
+}
+
+model WarrantyCase {
+  id         String      @id
+  code       String      @unique
+  version    Int
+  status     String
+  customerId String      @map("customer_id")
+  deviceId   String      @map("device_id")
+  channel    String
+  createdAt  DateTime    @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phần còn lại của WarrantyCase (@woms/domain/types) trừ events.
+  data       Json
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  device     Device      @relation(fields: [deviceId], references: [id])
+  events     CaseEvent[]
+  workOrder  WorkOrder?
+
+  @@index([status])
+  @@index([customerId])
+  @@map("warranty_cases")
+}
+
+// Lịch sử thao tác/chuyển trạng thái của ca (WorkflowHistory theo thiết kế của Đạt, case_status_history của Nam).
+model CaseEvent {
+  id         BigInt       @id @default(autoincrement())
+  caseId     String       @map("case_id")
+  seq        Int
+  at         DateTime     @db.Timestamptz(3)
+  by         String
+  action     String
+  fromStatus String?      @map("from_status")
+  toStatus   String?      @map("to_status")
+  note       String?
+  case       WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, seq])
+  @@map("case_events")
+}
+
+model WorkOrder {
+  id           String       @id
+  code         String       @unique
+  caseId       String       @unique @map("case_id")
+  technicianId String?      @map("technician_id")
+  createdAt    DateTime     @map("created_at") @db.Timestamptz(3)
+  // tasks, parts (giữ/cấp/dùng/trả), assignHistory, logs, startedAt, finishedAt
+  data         Json
+  case         WarrantyCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([technicianId])
+  @@map("work_orders")
+}
+
+model Part {
+  id       String @id
+  sku      String @unique
+  name     String
+  unit     String
+  onHand   Int    @map("on_hand")
+  reserved Int
+  location String
+  price    Int
+  fits     String
+
+  @@map("parts")
+}
+
+// Biến động kho (inventory_transactions của Nam): NHAP, GIU, BO_GIU, XUAT, TRA, DIEU_CHINH.
+model StockMove {
+  id     String   @id
+  at     DateTime @db.Timestamptz(3)
+  by     String
+  type   String
+  partId String   @map("part_id")
+  qty    Int
+  woCode String?  @map("wo_code")
+  note   String?
+
+  @@index([partId])
+  @@map("stock_moves")
+}
+
+model Approval {
+  id          String   @id
+  type        String
+  status      String
+  caseId      String?  @map("case_id")
+  woId        String?  @map("wo_id")
+  partId      String?  @map("part_id")
+  requestedBy String   @map("requested_by")
+  requestedAt DateTime @map("requested_at") @db.Timestamptz(3)
+  data        Json
+
+  @@index([status])
+  @@index([caseId])
+  @@map("approvals")
+}
+
+model Complaint {
+  id        String   @id
+  code      String   @unique
+  caseId    String   @map("case_id")
+  status    String
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+  data      Json
+
+  @@map("complaints")
+}
+
+model Holiday {
+  date String @id
+  name String
+
+  @@map("holidays")
+}
+
+model AuditLog {
+  id     String   @id
+  at     DateTime @db.Timestamptz(3)
+  by     String
+  entity String
+  ref    String
+  action String
+  detail String?
+
+  @@index([at])
+  @@map("audit_logs")
+}
+
+// Chống gửi trùng (EX-13): một khóa chỉ tạo một phiếu.
+model IdempotencyKey {
+  key       String   @id
+  caseId    String   @map("case_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("idempotency_keys")
+}
+
+model Counter {
+  name  String @id
+  value Int
+
+  @@map("counters")
+}
+
+// Transactional Outbox (thiết kế "Event Handler" của Đạt): ghi cùng transaction với thay đổi nghiệp vụ,
+// tiến trình nền đọc và xử lý (khởi tạo/ghi nhận SLA, gửi thông báo cho khách), đánh dấu đã xử lý.
+model OutboxEvent {
+  id          String    @id
+  type        String
+  aggregateId String    @map("aggregate_id")
+  payload     Json
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(3)
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+
+  @@index([processedAt, createdAt])
+  @@map("outbox_events")
+}
+
+// Thông báo gửi khách (SMS/email: bản hiện tại chỉ lưu để Customer Portal hiển thị). eventId duy nhất: xử lý lại
+// một sự kiện không tạo thông báo thứ hai (TC-052).
+model Notification {
+  id        String   @id
+  eventId   String   @unique @map("event_id")
+  caseId    String   @map("case_id")
+  channel   String
+  message   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([caseId])
+  @@map("notifications")
+}

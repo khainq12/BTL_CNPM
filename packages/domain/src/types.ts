@@ -246,13 +246,7 @@ export type StockMove = {
   note?: string
 }
 
-export type ApprovalType =
-  | 'NGOAI_LE_BH'
-  | 'BAO_GIA'
-  | 'MUA_LINH_KIEN'
-  | 'DIEU_CHINH_KHO'
-  | 'HUY_HO_SO'
-  | 'XEM_XET_QC'
+export type ApprovalType = 'NGOAI_LE_BH' | 'BAO_GIA' | 'MUA_LINH_KIEN' | 'DIEU_CHINH_KHO' | 'HUY_HO_SO' | 'XEM_XET_QC'
 
 export type Approval = {
   id: string

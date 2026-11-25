@@ -123,7 +123,13 @@ export function slaInfo(c: WarrantyCase, now = Date.now()): SlaInfo {
 
   if (active && !counted.has(active.p) && now > due) {
     const over = workingMinutesBetween(due, now)
-    return { kind: 'overdue', label: `Quá hạn ${Math.ceil(over / 60)} giờ`, detail: 'Đã quá hạn trước khi tạm dừng, thời gian tạm dừng không dời hạn.', dueAt, remaining: -over }
+    return {
+      kind: 'overdue',
+      label: `Quá hạn ${Math.ceil(over / 60)} giờ`,
+      detail: 'Đã quá hạn trước khi tạm dừng, thời gian tạm dừng không dời hạn.',
+      dueAt,
+      remaining: -over,
+    }
   }
   if (active && !active.overCap) {
     const reason = active.p.reason === 'CHO_LINH_KIEN' ? 'chờ linh kiện' : 'chờ khách xác nhận lại giá'
@@ -137,13 +143,25 @@ export function slaInfo(c: WarrantyCase, now = Date.now()): SlaInfo {
   }
   if (now > due) {
     const over = workingMinutesBetween(due, now)
-    return { kind: 'overdue', label: `Quá hạn ${Math.ceil(over / 60)} giờ`, detail: 'Đã vượt hạn 3 ngày làm việc kể từ khi xác nhận phương án.', dueAt, remaining: -over }
+    return {
+      kind: 'overdue',
+      label: `Quá hạn ${Math.ceil(over / 60)} giờ`,
+      detail: 'Đã vượt hạn 3 ngày làm việc kể từ khi xác nhận phương án.',
+      dueAt,
+      remaining: -over,
+    }
   }
   const remaining = workingMinutesBetween(now, due)
   const extra = active?.overCap ? ' Đã vượt giới hạn tạm dừng, phần vượt vẫn tính vào hạn.' : ''
   if (remaining <= PARAMS.warnBeforeMinutes)
     return { kind: 'soon', label: `Còn ${Math.max(1, Math.ceil(remaining / 60))} giờ`, detail: `Sắp quá hạn (còn ≤ 4 giờ làm việc).${extra}`, dueAt, remaining }
-  return { kind: 'ok', label: `Còn ${Math.ceil(remaining / 60)} giờ`, detail: `Tính theo giờ làm việc 08:00–17:30, Thứ 2–Thứ 7, trừ ngày lễ.${extra}`, dueAt, remaining }
+  return {
+    kind: 'ok',
+    label: `Còn ${Math.ceil(remaining / 60)} giờ`,
+    detail: `Tính theo giờ làm việc 08:00–17:30, Thứ 2–Thứ 7, trừ ngày lễ.${extra}`,
+    dueAt,
+    remaining,
+  }
 }
 
 export const SLA_RANK: Record<SlaKind, number> = {

@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Boxes,
   CalendarDays,
   ClipboardCheck,
@@ -34,6 +35,7 @@ export const NAV: { title: string; items: NavDef[] }[] = [
       { title: 'Bảng điều phối', url: '/dieu-phoi', icon: Workflow, page: 'dispatch', badgeKey: 'dispatch' },
       { title: 'Chờ kiểm tra chất lượng', url: '/kiem-dinh', icon: ClipboardCheck, page: 'qcQueue', badgeKey: 'qc' },
       { title: 'Phê duyệt', url: '/phe-duyet', icon: Stamp, page: 'approvals', badgeKey: 'approvals' },
+      { title: 'Bảng điều hành', url: '/bang-dieu-hanh', icon: BarChart3, page: 'dashboard' },
     ],
   },
   {

@@ -6,6 +6,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { describeError } from '@/api/hooks'
+import { isHttp } from '@/api/mode'
 import { login } from '@/api/service'
 import { resetDb } from '@/mock/db'
 import { useAuthStore } from '@/stores/auth-store'
@@ -98,21 +99,25 @@ export function SignIn() {
           </Form>
         </CardContent>
       </Card>
-      <p className='text-muted-foreground text-xs'>
-        Bản chạy thử với dữ liệu giả, chưa nối backend. Danh sách tài khoản mẫu xem trong README.txt của thư mục frontend.{' '}
-        <button
-          type='button'
-          className='hover:text-foreground underline underline-offset-2'
-          onClick={() => {
-            if (confirm('Xóa mọi thay đổi và khôi phục dữ liệu mẫu ban đầu?')) {
-              resetDb()
-              qc.clear()
-            }
-          }}
-        >
-          Khôi phục dữ liệu mẫu
-        </button>
-      </p>
+      {isHttp ? (
+        <p className='text-muted-foreground text-xs'>Kết nối máy chủ WOMS. Quên mật khẩu thì liên hệ quản lý để đặt lại.</p>
+      ) : (
+        <p className='text-muted-foreground text-xs'>
+          Bản chạy thử với dữ liệu giả trong trình duyệt. Danh sách tài khoản mẫu xem trong README của apps/staff-web.{' '}
+          <button
+            type='button'
+            className='hover:text-foreground underline underline-offset-2'
+            onClick={() => {
+              if (confirm('Xóa mọi thay đổi và khôi phục dữ liệu mẫu ban đầu?')) {
+                resetDb()
+                qc.clear()
+              }
+            }}
+          >
+            Khôi phục dữ liệu mẫu
+          </button>
+        </p>
+      )}
     </AuthLayout>
   )
 }

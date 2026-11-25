@@ -1,0 +1,32 @@
+{
+  "name": "@woms/domain",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Quy tắc nghiệp vụ WOMS dùng chung cho frontend và backend: 21 trạng thái, D1–D10, SLA giờ làm việc, kho, phê duyệt",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./src/*.ts",
+      "require": "./dist/*.js",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.4",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.4",
+    "@types/node": "^25.6.0"
+  }
+}

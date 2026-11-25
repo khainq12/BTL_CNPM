@@ -40,6 +40,7 @@ export const PAGE_ROLES = {
   stocktake: ['KHO'],
   stockHistory: ['KHO', 'QL'],
   approvals: ['QL'],
+  dashboard: ['QL'],
   complaints: ['CSKH', 'QL'],
   users: ['QL'],
   audit: ['QL'],

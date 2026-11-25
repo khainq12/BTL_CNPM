@@ -1,56 +1,45 @@
-import { useEffect, useState } from 'react';
-import { toInputValue } from './format';
-import DashboardPage from './pages/DashboardPage';
-import PortalPage from './pages/PortalPage';
-import SlaPage from './pages/SlaPage';
-import { StoreProvider, useStore } from './store';
+import { useEffect, useState } from 'react'
+import { isDemo } from './api'
+import Lookup from './pages/Lookup'
+import Request from './pages/Request'
 
 const TABS = [
-  { id: 'portal', label: 'Cổng khách hàng' },
-  { id: 'sla', label: 'Theo dõi SLA' },
-  { id: 'dash', label: 'Dashboard' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+  { id: 'tra-cuu', label: 'Tra cứu tiến độ' },
+  { id: 'gui-yeu-cau', label: 'Gửi yêu cầu bảo hành' },
+] as const
+type TabId = (typeof TABS)[number]['id']
 
-const readHash = (): TabId => {
-  const h = location.hash.slice(1);
-  return (TABS.find((t) => t.id === h)?.id ?? 'portal') as TabId;
-};
+const readHash = (): TabId => (TABS.find((t) => t.id === location.hash.slice(1))?.id ?? 'tra-cuu') as TabId
 
-function Shell() {
-  const { now, setNow } = useStore();
-  const [tab, setTab] = useState<TabId>(readHash);
+export default function App() {
+  const [tab, setTab] = useState<TabId>(readHash)
   useEffect(() => {
-    const f = () => setTab(readHash());
-    window.addEventListener('hashchange', f);
-    return () => window.removeEventListener('hashchange', f);
-  }, []);
+    const f = () => setTab(readHash())
+    window.addEventListener('hashchange', f)
+    return () => window.removeEventListener('hashchange', f)
+  }, [])
 
   return (
     <>
       <header>
         <b>WOMS</b>
-        <nav>
-          {TABS.map((t) => <a key={t.id} href={`#${t.id}`} className={tab === t.id ? 'on' : ''}>{t.label}</a>)}
+        <span className="sub">Cổng khách hàng bảo hành</span>
+        <nav aria-label="Chức năng">
+          {TABS.map((t) => (
+            <a key={t.id} href={`#${t.id}`} className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined}>
+              {t.label}
+            </a>
+          ))}
         </nav>
-        <div className="clock">
-          <label className="inline">Giờ hệ thống mẫu
-            <input type="datetime-local" value={toInputValue(now)}
-              onChange={(e) => { const v = new Date(e.target.value).getTime(); if (!isNaN(v)) setNow(v); }} />
-          </label>
-          <button className="btn s" onClick={() => setNow(now + 3_600_000)}>+1 giờ</button>
-          <button className="btn s" onClick={() => setNow(now + 86_400_000)}>+1 ngày</button>
-        </div>
+        {isDemo && <span className="b wn">Bản thử</span>}
       </header>
       <main>
-        {tab === 'portal' && <PortalPage />}
-        {tab === 'sla' && <SlaPage />}
-        {tab === 'dash' && <DashboardPage />}
+        {tab === 'tra-cuu' && <Lookup />}
+        {tab === 'gui-yeu-cau' && <Request />}
+        <p className="mut foot">
+          <small>Giờ làm việc 08:00–17:30, Thứ Hai – Thứ Bảy (trừ ngày lễ). Thời hạn sửa chữa 3 ngày làm việc kể từ khi trung tâm xác nhận phương án.</small>
+        </p>
       </main>
     </>
-  );
-}
-
-export default function App() {
-  return <StoreProvider><Shell /></StoreProvider>;
+  )
 }

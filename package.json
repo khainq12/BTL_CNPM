@@ -1,0 +1,44 @@
+{
+  "name": "woms",
+  "private": true,
+  "version": "0.3.0",
+  "description": "WOMS – Hệ thống quản lý hoạt động bảo hành của trung tâm hỗ trợ kỹ thuật (BTL Công nghệ phần mềm)",
+  "license": "UNLICENSED",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "e2e"
+  ],
+  "scripts": {
+    "build:domain": "npm run build -w @woms/domain",
+    "build": "npm run build:domain && npm run build -w @woms/api && npm run build -w @woms/staff-web && npm run build -w @woms/portal",
+    "typecheck": "npm run build:domain && npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"packages/**/*.{ts,tsx,json}\" \"apps/api/**/*.{ts,json}\" \"e2e/**/*.ts\" \"scripts/**/*.mjs\"",
+    "format:check": "prettier --check \"packages/**/*.{ts,tsx,json}\" \"apps/api/**/*.{ts,json}\" \"e2e/**/*.ts\" \"scripts/**/*.mjs\"",
+    "test:unit": "npm run test -w @woms/domain && npm run test -w @woms/portal && npm run test -w @woms/staff-web",
+    "test:api": "npm run build:domain && npm run test:integration -w @woms/api",
+    "test:e2e": "npm run test -w @woms/e2e",
+    "test": "npm run test:unit && npm run test:api",
+    "report": "node scripts/test-report.mjs",
+    "db:local": "node scripts/local-postgres.mjs",
+    "dev:api": "npm run dev -w @woms/api",
+    "dev:web": "npm run dev -w @woms/staff-web",
+    "dev:portal": "npm run dev -w @woms/portal"
+  },
+  "devDependencies": {
+    "embedded-postgres": "17.12.0-beta.19",
+    "exceljs": "4.4.0",
+    "prettier": "^3.8.3"
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "@embedded-postgres/windows-x64@17.12.0-beta.19": true
+  }
+}

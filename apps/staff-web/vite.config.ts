@@ -17,10 +17,14 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    // @/domain/* trỏ tới quy tắc nghiệp vụ dùng chung (packages/domain), phần còn lại của @/ là mã frontend.
+    alias: [
+      { find: /^@\/domain\/(.*)$/, replacement: path.resolve(__dirname, '../../packages/domain/src/$1') },
+      { find: /^@\/(.*)$/, replacement: path.resolve(__dirname, './src/$1') },
+    ],
   },
+  server: { port: 5173, strictPort: true },
+  preview: { port: 4173, strictPort: true },
   test: {
     silent: 'passed-only',
     unstubEnvs: true,

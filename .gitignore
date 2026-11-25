@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+# kết quả kiểm thử (CI đẩy lên artifact)
+test-results/
+playwright-report/
+blob-report/
+reports/
+.local-pg/
+*.log
+.DS_Store

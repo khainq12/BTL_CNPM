@@ -1,28 +1,40 @@
 import { useEffect } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
+import { emptyDb } from '@/domain/db'
+import { setHolidays } from '@/domain/sla'
 import type { User } from '@/domain/types'
-import { loadDb, onExternalChange, StorageFullError, type Db } from '@/mock/db'
+import { onExternalChange, StorageFullError, type Db } from '@/mock/db'
 import { useAuthStore } from '@/stores/auth-store'
-import { ApiError } from './service'
+import { isHttp } from './mode'
+import { ApiError, fetchWorkspace } from './service'
 
-// Toàn bộ dữ liệu đọc qua một query. Khi có API thật, tách thành các query theo endpoint (GET /cases, /parts...).
-export function useDb() {
+// Dữ liệu làm việc của tài khoản: backend trả về phần dữ liệu vai trò được xem (GET /workspace, đã lọc theo RBAC);
+// bản chạy thử đọc từ localStorage.
+export const workspaceQuery = queryOptions({
+  queryKey: ['db'],
+  queryFn: async () => {
+    const db = (await fetchWorkspace()) as Db
+    setHolidays(db.holidays.map((h) => h.date))
+    return db
+  },
+  staleTime: isHttp ? 5_000 : 0,
+})
+
+const EMPTY = emptyDb()
+
+export function useDb(): Db {
   const qc = useQueryClient()
-  useEffect(() => onExternalChange(() => qc.invalidateQueries({ queryKey: ['db'] })), [qc])
-  return useQuery({
-    queryKey: ['db'],
-    queryFn: async () => structuredClone(loadDb()) as Db,
-    initialData: () => structuredClone(loadDb()) as Db,
-    staleTime: 0,
-  }).data
+  useEffect(() => (isHttp ? undefined : onExternalChange(() => qc.invalidateQueries({ queryKey: ['db'] }))), [qc])
+  const q = useQuery({ ...workspaceQuery, refetchInterval: isHttp ? 15_000 : false, refetchOnWindowFocus: isHttp })
+  return q.data ?? EMPTY
 }
 
 export function useMe(): User {
   const db = useDb()
-  const id = useAuthStore((s) => s.session?.userId)
-  const u = db.users.find((x) => x.id === id)
+  const session = useAuthStore((s) => s.session)
+  const u = db.users.find((x) => x.id === session?.userId) ?? (isHttp ? session?.user : undefined)
   if (!u) throw new Error('Phiên đăng nhập không hợp lệ')
   return u
 }
@@ -40,8 +52,8 @@ export function useAction<A extends unknown[]>(fn: (...args: A) => Promise<unkno
   const navigate = useNavigate()
   return useMutation({
     mutationFn: (args: A) => fn(...args),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['db'] })
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['db'] })
       if (opts?.success) toast.success(opts.success)
       opts?.onDone?.()
     },

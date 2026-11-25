@@ -21,4 +21,4 @@ stateDiagram-v2
     
     Resolved --> Closed : Giao máy cho khách & Thanh toán
     Closed --> [*]
-<img width="825" height="416" alt="image" src="https://github.com/user-attachments/assets/b71b4a21-b2d9-4fe5-b2a4-a71bff57e0ba" />
+

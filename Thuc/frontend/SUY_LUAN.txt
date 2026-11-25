@@ -1,0 +1,218 @@
+CÁC ĐIỂM TV6 TỰ SUY LUẬN KHI DỰNG FRONTEND NỘI BỘ
+WOMS - Staff Workspace
+Ngày lập: 12/11/2026 (cập nhật lần 2 cùng ngày: BR-12, ngày lễ, ảnh)
+Nguồn chính: Files/WOMS_Ban_Cuoi_Hop_Nhat_Day_Du.docx (bản hợp nhất 12/11/2026)
+
+Tài liệu hợp nhất là nguồn chính. Các mục dưới đây là chỗ tài liệu chưa nói rõ,
+TV6 phải tự quyết để dựng được giao diện. Mỗi mục ghi: suy luận, căn cứ, cần ai xác nhận.
+Khi nhóm chốt khác đi, sửa ở file cấu hình tương ứng (ghi trong ngoặc).
+
+
+1. VAI TRÒ VÀ PHÂN QUYỀN
+------------------------
+
+1.1. Ai thực hiện từng bước chuyển trạng thái.
+     Bảng 6.2 chỉ có cột Từ / Đến / Điều kiện, không có cột vai trò.
+     TV6 suy ra từ ma trận phân quyền 5.3 và quy trình 6.1:
+       - PENDING_ACCEPT -> RECEIVED: tiếp nhận.
+       - RECEIVED -> PRECHECK, PRECHECK <-> WAITING_INFORMATION: CSKH.
+       - PRECHECK -> DIAGNOSING: điều phối viên (giao kỹ thuật viên).
+       - DIAGNOSING -> ELIGIBILITY_REVIEW: kỹ thuật viên được giao.
+       - ELIGIBILITY_REVIEW -> QUOTED / WO_CREATED / RETURN_PENDING / WAITING_APPROVAL: CSKH.
+       - WAITING_APPROVAL -> ELIGIBILITY_REVIEW: quản lý.
+       - QUOTED -> WO_CREATED / RETURN_PENDING: CSKH ghi nhận phản hồi khách.
+       - WO_CREATED -> WAITING_PARTS / READY_TO_REPAIR, WAITING_PARTS -> READY_TO_REPAIR: kho.
+       - READY_TO_REPAIR -> ASSIGNED: điều phối viên.
+       - ASSIGNED -> IN_REPAIR, REWORK -> IN_REPAIR, IN_REPAIR -> TESTING: kỹ thuật viên.
+       - TESTING -> READY_FOR_DELIVERY / REWORK / MANAGER_REVIEW: QC.
+       - MANAGER_REVIEW -> IN_REPAIR / RETURN_PENDING: quản lý.
+       - RETURN_PENDING -> READY_FOR_DELIVERY: CSKH.
+       - READY_FOR_DELIVERY -> COMPLETED: tiếp nhận.
+       - RECEIVED -> CANCELLED: tiếp nhận hoặc CSKH đề nghị, quản lý duyệt.
+     Cần xác nhận: TV5. (src/domain/statuses.ts, TRANSITIONS)
+
+1.2. Ai được mở chi tiết phiếu.
+     - Kỹ thuật viên: chỉ phiếu mình được giao chẩn đoán hoặc sửa.
+     - Kho: chỉ phiếu đã có lệnh sửa chữa.
+     - QC: phiếu đang chờ kiểm tra, hoặc phiếu mình đã từng kiểm tra.
+     - Các vai trò còn lại: mọi phiếu.
+     Căn cứ: ma trận 5.3 ("Xem công việc được giao", "Xem thông tin cần cấp linh kiện",
+     "Xem hồ sơ cần kiểm tra"), AT-14.
+     Cần xác nhận: TV2. (src/features/cases/logic.ts, canViewCase)
+
+1.3. Thông tin liên hệ của khách bị ẩn với kỹ thuật viên, kho, QC.
+     Căn cứ: hàng "Xem thông tin khách hàng" trong ma trận 5.3 ghi "Không".
+     Cần xác nhận: TV2. (logic.ts, canSeeCustomer)
+
+1.4. Mỗi tài khoản một vai trò. Không có tài khoản kiêm nhiều vai trò.
+     Muốn làm vai trò khác phải đăng xuất và đăng nhập tài khoản khác (theo yêu cầu của TV6).
+     Cần xác nhận: TV2.
+
+1.5. Người kiểm tra chất lượng phải khác người sửa thiết bị.
+     Căn cứ: nguyên tắc kiểm soát chung; tài liệu không nói rõ.
+     Cần xác nhận: TV2. (src/api/service.ts, submitQc)
+
+1.6. Quản lý xem được bảng điều phối nhưng không thao tác phân công (chỉ điều phối viên giao việc, C02).
+     Màn phê duyệt của quản lý đặt trong Staff Workspace (TV6), không đặt ở Manager Dashboard.
+     Cần xác nhận: TV1, TV7 (RTM vẫn ghi FR-05 thuộc Manager Dashboard).
+
+
+2. QUY TRÌNH VÀ TRẠNG THÁI
+--------------------------
+
+2.1. Tên tiếng Việt của 21 trạng thái do TV6 đặt (ví dụ ELIGIBILITY_REVIEW = "Xét điều kiện bảo hành",
+     RETURN_PENDING = "Chuẩn bị trả không sửa").
+     Cần xác nhận: TV5, TV8. (statuses.ts, CASE_STATUS)
+
+2.2. Kiểm tra sơ bộ (PRECHECK): CSKH ghi một trong ba kết quả: còn hạn, hết hạn, chưa đủ thông tin.
+     Hệ thống gợi ý từ ngày mua và thời hạn bảo hành của thiết bị; không có ngày mua thì gợi ý
+     "chưa đủ thông tin" (C05). Sau đó điều phối viên mới giao chẩn đoán.
+
+2.3. Khi CSKH kết luận "miễn phí" hoặc khách đồng ý báo giá, hệ thống tự lập lệnh sửa chữa (WO)
+     từ biên bản chẩn đoán: công việc và linh kiện dự kiến do kỹ thuật viên ghi ở bước chẩn đoán
+     được chép sang WO. Điều phối viên không phải lập lại WO.
+     Nếu WO không cần linh kiện, phiếu chuyển thẳng sang "Sẵn sàng sửa".
+     Căn cứ: UC-08 (kỹ thuật viên lập task), bảng 6.2 (WO_CREATED -> READY_TO_REPAIR khi không cần linh kiện).
+     Cần xác nhận: TV2, TV5.
+
+2.4. Báo giá trên 2.000.000 đ: phiếu chuyển WAITING_APPROVAL, quản lý duyệt xong phiếu quay về
+     ELIGIBILITY_REVIEW, CSKH bấm "Gửi báo giá đã duyệt" thì mới sang QUOTED.
+     Căn cứ: BR-07 và bảng 6.2 (dùng chung cặp ELIGIBILITY_REVIEW <-> WAITING_APPROVAL).
+
+2.5. Đề nghị ngoại lệ bảo hành: CSKH chọn "Đề nghị ngoại lệ", quản lý duyệt hoặc từ chối,
+     phiếu quay về ELIGIBILITY_REVIEW. Được duyệt thì CSKH mới chọn được "Miễn phí";
+     bị từ chối thì chỉ còn "Có phí" hoặc "Không sửa".
+
+2.6. Kết luận "chưa rõ" sau chẩn đoán không có trạng thái riêng trong bảng 6.2.
+     TV6 dùng nhánh "Đề nghị ngoại lệ" (WAITING_APPROVAL) cho trường hợp D6, D7.
+     Cần xác nhận: TV5 (có cần thêm ELIGIBILITY_REVIEW -> WAITING_INFORMATION không).
+
+2.7. Kho có 2 bước: "Giữ linh kiện" (trừ khả dụng, tăng đã giữ) và "Cấp phát cho kỹ thuật viên"
+     (trừ tồn thực tế). Kỹ thuật viên chỉ bấm "Bắt đầu sửa" khi đã nhận đủ linh kiện (BR-13).
+     Hoàn tất sửa: kỹ thuật viên ghi số đã dùng, phần dư thành "chờ trả kho", kho xác nhận nhận lại (BR-16).
+
+2.8. Báo thiếu linh kiện: phiếu sang WAITING_PARTS, bắt đầu tạm dừng thời hạn, hệ thống tự tạo
+     đề nghị mua gửi quản lý (BR-17). Hàng về: kho nhập kho rồi bấm "Giữ linh kiện khả dụng",
+     đủ thì phiếu sang READY_TO_REPAIR và kết thúc tạm dừng.
+
+2.9. QC không đạt: lần 1 và lần 2 chuyển REWORK (đếm số lần sửa lại). Đã sửa lại 2 lần mà lần
+     kiểm tra tiếp theo vẫn không đạt thì chuyển MANAGER_REVIEW (BR-22, PARAM-10).
+     Khi kỹ thuật viên nhận xử lý lại, hệ thống thêm một công việc "Xử lý lại: <lỗi QC>" vào WO.
+
+2.10. Quản lý quyết định sau MANAGER_REVIEW: "Sửa tiếp" (về IN_REPAIR, thêm công việc theo chỉ đạo)
+      hoặc "Dừng sửa, trả máy" (về RETURN_PENDING). Không có lựa chọn đổi máy tự động (C13).
+
+2.11. Bàn giao: phải đánh dấu đủ 3 mục đối chiếu (phụ kiện, khách đã kiểm tra, đã ký biên bản)
+      và ghi cách xác thực người nhận. Phân biệt chính chủ / nhận hộ.
+      Đánh giá sao do nhân viên ghi hộ nếu khách muốn; đánh giá trên portal là việc của TV7.
+
+2.12. Hủy phiếu chỉ cho phép ở trạng thái RECEIVED (theo bảng 6.2) và luôn cần quản lý duyệt.
+
+2.13. Đổi phương án khi đang sửa (BR-12). Bảng 6.2 không có bước chuyển riêng, nên phiếu vẫn ở
+      IN_REPAIR; đề xuất có trạng thái phụ riêng (mục 6.2 cho phép thêm trạng thái phụ):
+        chờ CSKH xét -> (chờ quản lý duyệt báo giá -> chờ gửi) -> chờ khách xác nhận -> đã áp dụng / không áp dụng.
+      Luồng suy ra từ RACI 5.4 và giải thích bên dưới RACI:
+        - Kỹ thuật viên đang sửa ghi lỗi mới, phương án mới, công việc và linh kiện bổ sung, tiền công ước tính.
+        - CSKH chọn: trong phạm vi bảo hành (áp dụng ngay), phát sinh phí (lập báo giá bổ sung),
+          hoặc không chấp nhận (làm tiếp phương án cũ).
+        - Báo giá bổ sung trên 2.000.000 đ cần quản lý duyệt trước khi gửi (BR-07), tính theo riêng
+          phần bổ sung, không cộng báo giá cũ.
+        - Gửi báo giá bổ sung thì bắt đầu tạm dừng hạn "chờ xác nhận lại giá", tối đa 5 ngày (PARAM-16).
+        - Khách đồng ý: công việc, linh kiện mới được thêm vào lệnh sửa chữa; kho giữ và cấp phát
+          phần thêm như bình thường. Khách từ chối: CSKH chọn làm tiếp phương án cũ, hoặc dừng sửa
+          và chuyển RETURN_PENDING (bước IN_REPAIR -> RETURN_PENDING không có trong bảng 6.2).
+        - Trong lúc chờ, kỹ thuật viên không đánh dấu công việc, không hoàn tất được; vẫn ghi nhật ký được.
+        - Dừng sửa giữa chừng: linh kiện đang giữ được trả về khả dụng; linh kiện đã cấp mà chưa dùng
+          chuyển "chờ trả kho" (coi như chưa dùng cái nào). Áp dụng cả khi quản lý chọn "Dừng sửa"
+          sau MANAGER_REVIEW. Phần linh kiện chưa cấp thì bỏ khỏi lệnh sửa chữa (không còn cần).
+          Đề nghị mua do báo thiếu cho lệnh đó mà quản lý chưa duyệt thì hệ thống tự chuyển "Đã hủy"
+          (trạng thái mới của đề nghị), ghi "Tự hủy" chứ không ghi người dừng sửa là người hủy (họ không
+          có quyền phê duyệt); nhật ký ghi vào lệnh sửa chữa. Đề nghị đã duyệt thì giữ nguyên vì có thể
+          đã đặt hàng.
+        - Linh kiện bổ sung hết hàng: kho được "Báo thiếu linh kiện" cả khi phiếu đang sửa. Hệ thống tạo
+          đề nghị mua (BR-17) và tạm dừng hạn "chờ linh kiện" (PARAM-17), nhưng phiếu vẫn ở IN_REPAIR
+          (bảng 6.2 không có IN_REPAIR -> WAITING_PARTS) để kỹ thuật viên làm tiếp các việc không cần
+          linh kiện đó. Kho giữ đủ phần thiếu thì hết tạm dừng. Cách đặt mua xem 2.16.
+        - Phiếu đang sửa mà chờ linh kiện được tính là "đang chờ linh kiện" ở mọi hàng đợi (kho, điều phối,
+          quản lý, trang Nhập kho), như phiếu ở bước WAITING_PARTS.
+        - Mỗi lần chỉ có một đề xuất đang mở. Lưu cả phương án cũ và mới.
+      Cần xác nhận: TV2, TV5. (src/api/service.ts, mục "Đổi phương án"; src/features/cases/plan-change.tsx;
+      src/domain/plan-change.ts)
+
+2.14. Kho chỉ cấp phát linh kiện khi lệnh sửa chữa đã có kỹ thuật viên được phân công,
+      vì cấp phát là giao cho người cụ thể (BR-15). Giữ linh kiện thì làm được trước khi phân công.
+      Cần xác nhận: TV2.
+
+2.15. Khiếu nại lưu lịch sử từng lần cập nhật (tình trạng, ghi chú, người, giờ). Khi đóng khiếu nại
+      phải ghi kết quả mới, không dùng lại ghi chú của lần chuyển quản lý.
+
+2.16. Báo thiếu, đề nghị mua và hàng về (BR-14..17). Tài liệu chỉ nói "thiếu thì đề nghị mua, quản lý
+      duyệt", nên các điểm sau là suy luận:
+        - Đề nghị mua do báo thiếu gắn với lệnh sửa chữa. Số "đang chờ mua" của một dòng không lưu riêng
+          mà tính từ các đề nghị đó: đề nghị chờ duyệt cộng phần đã duyệt mà chưa nhận hàng.
+        - Báo thiếu chỉ đề nghị mua phần không có sẵn trong kho và chưa có đề nghị đang chờ. Kho còn hàng
+          thì phải "Giữ" chứ không báo thiếu (tránh dừng thời hạn và mua thừa).
+        - Báo thiếu được ở 3 bước: chuẩn bị linh kiện, đang chờ linh kiện (đề nghị cũ bị từ chối, hoặc hàng
+          về đã giữ cho lệnh khác), đang sửa (đổi phương án). Báo lại không mở thêm khoảng tạm dừng.
+        - Nhập kho ghi nhận hàng về cho các đề nghị mua đã duyệt của linh kiện đó, đề nghị cũ trước. Kho bỏ
+          chọn ô "theo đề nghị mua" nếu hàng nhập không phải từ đề nghị (ví dụ nhà cung cấp đổi bảo hành).
+          Đề nghị hiện "Đã duyệt, chờ hàng về", "đã nhận x/y" hoặc "đã nhận hàng".
+        - Hàng về là của kho, chưa gắn với lệnh nào; kho chọn giữ cho lệnh nào. Nếu giữ cho lệnh khác thì
+          lệnh đặt mua ban đầu lại cần đặt mua và kho báo thiếu lại được.
+      Cần xác nhận: TV2 (quy trình kho), TV4 (API nhập kho có gắn đề nghị mua). (src/domain/parts.ts)
+
+
+3. THỜI HẠN XỬ LÝ (SLA)
+-----------------------
+
+3.1. Hạn = 3 ngày làm việc (3 x 9,5 giờ) tính từ lúc phương án được xác nhận
+     (lúc lập WO), cộng thời gian tạm dừng hợp lệ có giới hạn (C16, C17).
+3.2. Trước khi xác nhận phương án, phiếu hiện "Chưa tính hạn".
+3.3. Hạn dừng tính khi thiết bị sẵn sàng bàn giao hoặc chuyển trả không sửa; từ đó theo dõi riêng
+     số ngày chờ khách nhận (PARAM-05: quá 30 ngày thì cảnh báo).
+3.4. Giờ làm việc 08:00-17:30, Thứ 2 đến Thứ 7, giờ Việt Nam, trừ ngày nghỉ lễ.
+     Ngày nghỉ lễ do quản lý khai báo ở màn "Lịch làm việc" (Quản trị). Dữ liệu mẫu có các ngày nghỉ
+     năm 2026 theo thông báo nghỉ hằng năm (Tết Dương lịch, Tết Nguyên đán 14-22/02, nghỉ bù Giỗ Tổ 27/04,
+     30/04, 01/05, Quốc khánh 01-02/09) và 01/01/2027. Tết Nguyên đán 2027 chưa nhập vì chưa có
+     thông báo chính thức. Các ngày này cần quản lý đối chiếu lại.
+     Thêm hoặc xóa ngày nghỉ thì hạn của mọi phiếu đang mở được tính lại ngay.
+     Giờ làm việc giữ cố định trong cấu hình, không sửa trên giao diện.
+     Cần xác nhận: TV2 (danh sách ngày nghỉ), TV4 (lưu lịch ở backend). (src/domain/sla.ts)
+3.5. Tạm dừng bắt đầu khi phiếu đã quá hạn thì không dời hạn: thời gian tạm dừng chỉ được trừ
+     nếu bắt đầu trước hạn. Phiếu vẫn hiện "Quá hạn" trong lúc tạm dừng đó.
+     Căn cứ: mục 6.3 yêu cầu lưu "thời gian vượt giới hạn"; tạm dừng không xóa vi phạm đã xảy ra.
+     Cần xác nhận: TV2.
+3.6. Hai khoảng tạm dừng có thể chồng nhau (đang chờ linh kiện bổ sung thì lại chờ khách xác nhận
+     báo giá bổ sung). Phần thời gian chồng nhau chỉ được trừ một lần; mỗi khoảng vẫn bị giới hạn
+     riêng (5 ngày chờ giá, 3 ngày chờ linh kiện). Cần xác nhận: TV2. (src/domain/sla.ts)
+
+
+4. DỮ LIỆU, GIAO DIỆN, KỸ THUẬT
+-------------------------------
+
+4.1. Chưa có backend: dữ liệu giả lưu trong localStorage của trình duyệt (src/mock).
+     Mỗi hàm trong src/api/service.ts tương ứng một API dự kiến, có kiểm tra quyền và quy tắc
+     giống backend. Khi TV4 có Swagger, thay phần thân hàm bằng lời gọi HTTP.
+4.2. Chống gửi trùng (EX-13): nút gửi bị khóa khi đang gửi; tạo phiếu gửi kèm khóa idempotency,
+     gửi lại cùng khóa không tạo phiếu thứ hai.
+4.3. Xung đột phiên bản (EX-14): mỗi phiếu có số version; ghi với version cũ thì báo
+     "Phiếu vừa được người khác cập nhật" kèm nút Tải lại (giả lập mã 409).
+     Thử bằng cách mở 2 tab, đăng nhập 2 tài khoản, cùng thao tác trên một phiếu.
+4.4. Phiên đăng nhập 8 giờ (một ca làm việc). Mật khẩu mới tối thiểu 8 ký tự, có chữ và số.
+     Cần xác nhận: TV4.
+4.5. Ảnh hiện trạng: tối đa 8 ảnh, nhận tệp gốc tới 15 MB. Ảnh được nén ngay trên trình duyệt
+     (cạnh dài tối đa 1280 px, JPEG) rồi mới lưu, để tiết kiệm dung lượng và băng thông.
+     Bản chạy thử lưu ảnh nén trong localStorage; đầy bộ nhớ thì báo lỗi và không lưu thay đổi.
+     QC được đính kèm tối đa 4 ảnh kết quả kiểm tra (không bắt buộc, theo "nếu cần" ở mô tả vai trò QC).
+     Bấm vào ảnh để xem lớn. Ảnh trong dữ liệu mẫu chỉ có tên tệp.
+     Cần xác nhận: TV4 (API upload, nơi lưu tệp, có cần giữ ảnh gốc không).
+4.6. Checklist QC theo loại thiết bị (laptop, PC, máy in) do TV6 đề xuất. Cần xác nhận: TV2.
+4.7. Danh sách lý do yêu cầu bổ sung, phương thức khách xác nhận giá, danh sách phụ kiện
+     do TV6 đề xuất. Cần xác nhận: TV2. (src/domain/rules.ts)
+4.8. Mã lệnh sửa chữa dạng WO-0001, mã khiếu nại dạng KN-0001. Cần xác nhận: TV5.
+4.9. Tìm phiếu theo mã phiếu, số điện thoại, tên khách; không tìm bằng serial (BR-11).
+     Trang thiết bị (FR-17) vẫn xem lịch sử theo serial vì là tra cứu nội bộ từ phiếu.
+4.10. Chưa có màn quản lý danh mục (chính sách bảo hành, reason code, checklist): dùng dữ liệu cấu hình.
+4.11. Thông báo SMS/email cho khách do hệ thống/TV7 làm, không có màn hình trong Staff Workspace.
+4.12. Giao diện ưu tiên máy tính; co giãn được trên máy tính bảng (NFR-05).
+      Có chế độ sáng/tối theo hệ thống.

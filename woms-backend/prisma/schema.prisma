@@ -1,0 +1,541 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMS CHUẨN HÓA (THEO MỤC 6.2 & PHẦN 5)
+// ==========================================
+
+enum CaseStatus {
+  DRAFT
+  PENDING_ACCEPT
+  RECEIVED
+  PRECHECK
+  WAITING_INFORMATION
+  DIAGNOSING
+  ELIGIBILITY_REVIEW
+  WAITING_APPROVAL
+  QUOTED
+  WO_CREATED
+  WAITING_PARTS
+  READY_TO_REPAIR
+  ASSIGNED
+  IN_REPAIR
+  TESTING
+  REWORK
+  MANAGER_REVIEW
+  READY_FOR_DELIVERY
+  COMPLETED
+  RETURN_PENDING
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ServiceType {
+  WARRANTY_FREE
+  PAID_REPAIR
+  INSPECTION_ONLY
+}
+
+enum WorkOrderStatus {
+  PENDING
+  WAITING_PARTS
+  READY
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  PENDING_MANAGER_APPROVAL // Khi > 2.000.000 VND (BR-07)
+  SENT_TO_CUSTOMER
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum InventoryTransType {
+  IMPORT
+  RESERVE
+  RELEASE_RESERVE
+  ISSUE
+  RETURN
+  ADJUSTMENT
+}
+
+// ==========================================
+// 1. NGƯỜI DÙNG & PHÂN QUYỀN (8 ROLES - C23)
+// ==========================================
+
+model User {
+  userId       Int        @id @default(autoincrement()) @map("user_id")
+  fullName     String     @map("full_name")
+  email        String     @unique
+  phone        String     @unique
+  passwordHash String     @map("password_hash") // NFR-01: Bcrypt
+  status       String     @default("ACTIVE")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  userRoles         UserRole[]
+  createdCases      WarrantyCase[]      @relation("CaseCreator")
+  diagnoses         Diagnosis[]
+  warrantyDecisions WarrantyDecision[]
+  assignedWOs       WorkOrder[]         @relation("WOAssignee")
+  taskAssignments   TaskAssignment[]
+  inspections       Inspection[]
+  handoversGiven    Handover[]          @relation("HandoverStaff")
+  statusHistories   CaseStatusHistory[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Role {
+  roleId      Int     @id @default(autoincrement()) @map("role_id")
+  roleName    String  @unique @map("role_name") // CUSTOMER, RECEPTIONIST, CSKH, COORDINATOR, TECHNICIAN, WAREHOUSE, QC, MANAGER
+  description String?
+
+  userRoles       UserRole[]
+  transitionRoles TransitionRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId Int @map("user_id")
+  roleId Int @map("role_id")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ==========================================
+// 2. KHÁCH HÀNG, THIẾT BỊ & CHÍNH SÁCH
+// ==========================================
+
+model Customer {
+  customerId Int      @id @default(autoincrement()) @map("customer_id")
+  userId     Int?     @unique @map("user_id") // Nếu khách có tài khoản Portal
+  fullName   String   @map("full_name")
+  phone      String   @unique
+  email      String?
+  address    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  devices Device[]
+
+  @@map("customers")
+}
+
+model WarrantyPolicy {
+  policyId       Int      @id @default(autoincrement()) @map("policy_id")
+  policyCode     String   @unique @map("policy_code")
+  policyName     String   @map("policy_name")
+  durationMonths Int      @default(12) @map("duration_months") // PARAM-02
+  coveredParts   Json?    @map("covered_parts")
+  voidConditions Json?    @map("void_conditions")
+  isActive       Boolean  @default(true) @map("is_active")
+
+  devices Device[]
+
+  @@map("warranty_policies")
+}
+
+model Device {
+  deviceId       Int       @id @default(autoincrement()) @map("device_id")
+  customerId     Int       @map("customer_id")
+  policyId       Int?      @map("policy_id")
+  serialNumber   String    @unique @map("serial_number")
+  brand          String
+  model          String
+  deviceType     String    @map("device_type") // Laptop, PC, Printer
+  warrantyExpiry DateTime? @map("warranty_expiry")
+
+  customer      Customer        @relation(fields: [customerId], references: [customerId])
+  policy        WarrantyPolicy? @relation(fields: [policyId], references: [policyId])
+  warrantyCases WarrantyCase[]
+
+  @@map("devices")
+}
+
+// ==========================================
+// 3. BẢO HÀNH & SỬA CHỮA (CORE BACKEND)
+// ==========================================
+
+model WarrantyCase {
+  caseId           Int          @id @default(autoincrement()) @map("case_id")
+  caseCode         String       @unique @map("case_code") // CAS-YYYYMMDD-XXXX (FR-01)
+  deviceId         Int          @map("device_id")
+  createdBy        Int          @map("created_by")
+  issueDescription String       @map("issue_description") @db.Text
+  accessories      String?      // Phụ kiện đi kèm (BR-02)
+  physicalState    String?      @map("physical_state") // Tình trạng ngoại quan (BR-02)
+  attachments      Json?        // Ảnh chụp lúc tiếp nhận
+  priority         Priority     @default(MEDIUM)
+  serviceType      ServiceType? @map("service_type")
+  status           CaseStatus   @default(RECEIVED)
+  reworkCount      Int          @default(0) @map("rework_count") // Giới hạn 2 lần (BR-22)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  device            Device              @relation(fields: [deviceId], references: [deviceId])
+  creator           User                @relation("CaseCreator", fields: [createdBy], references: [userId])
+  diagnoses         Diagnosis[]
+  warrantyDecisions WarrantyDecision[]
+  quotations        Quotation[]
+  workOrders        WorkOrder[]
+  handover          Handover?
+  slaInstances      SlaInstance[]
+  statusHistories   CaseStatusHistory[]
+
+  @@map("warranty_cases")
+}
+
+model Diagnosis {
+  diagnosisId     Int      @id @default(autoincrement()) @map("diagnosis_id")
+  caseId          Int      @map("case_id")
+  diagnosisResult String   @map("diagnosis_result") @db.Text
+  rootCause       String   @map("root_cause") @db.Text
+  proposedPlan    String?  @map("proposed_plan") @db.Text
+  createdBy       Int      @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  warrantyCase WarrantyCase @relation(fields: [caseId], references: [caseId])
+  technician   User         @relation(fields: [createdBy], references: [userId])
+
+  @@map("diagnoses")
+}
+
+model WarrantyDecision {
+  decisionId     Int      @id @default(autoincrement()) @map("decision_id")
+  caseId         Int      @map("case_id")
+  isWarranty     Boolean? @map("is_warranty") // null = Chưa rõ (BR-06)
+  decisionReason String   @map("decision_reason") @db.Text
+  decidedBy      Int      @map("decided_by")
+  approvedBy     Int?     @map("approved_by") // Quản lý duyệt ngoại lệ (C01)
+  decidedAt      DateTime @default(now()) @map("decided_at")
+
+  warrantyCase WarrantyCase @relation(fields: [caseId], references: [caseId])
+  decider      User         @relation(fields: [decidedBy], references: [userId])
+
+  @@map("warranty_decisions")
+}
+
+model Quotation {
+  quotationId   Int         @id @default(autoincrement()) @map("quotation_id")
+  caseId        Int         @map("case_id")
+  version       Int         @default(1) // Tạo version mới nếu đổi giá (AT-15)
+  partsCost     Decimal     @default(0) @map("parts_cost") @db.Decimal(12, 2)
+  laborCost     Decimal     @default(0) @map("labor_cost") @db.Decimal(12, 2)
+  totalAmount   Decimal     @map("total_amount") @db.Decimal(12, 2)
+  status        QuoteStatus @default(DRAFT)
+  managerNote   String?     @map("manager_note")
+  customerProof String?     @map("customer_proof") // OTP / Portal log / Chữ ký (C08)
+  approvedAt    DateTime?   @map("approved_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  warrantyCase WarrantyCase @relation(fields: [caseId], references: [caseId])
+
+  @@map("quotations")
+}
+
+model WorkOrder {
+  workOrderId Int             @id @default(autoincrement()) @map("work_order_id")
+  woCode      String          @unique @map("wo_code") // WO-xxxx (UC-08)
+  caseId      Int             @map("case_id")
+  assignedTo  Int?            @map("assigned_to")
+  status      WorkOrderStatus @default(PENDING)
+  startTime   DateTime?       @map("start_time")
+  endTime     DateTime?       @map("end_time")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  warrantyCase   WarrantyCase    @relation(fields: [caseId], references: [caseId])
+  assignee       User?           @relation("WOAssignee", fields: [assignedTo], references: [userId])
+  workTasks      WorkTask[]
+  workOrderParts WorkOrderPart[]
+  inspections    Inspection[]
+
+  @@map("work_orders")
+}
+
+model WorkTask {
+  taskId        Int     @id @default(autoincrement()) @map("task_id")
+  workOrderId   Int     @map("work_order_id")
+  taskName      String  @map("task_name")
+  status        String  @default("TODO")
+  estimatedTime Int?    @map("estimated_time") // Tính theo phút
+
+  workOrder       WorkOrder        @relation(fields: [workOrderId], references: [workOrderId], onDelete: Cascade)
+  taskAssignments TaskAssignment[]
+
+  @@map("work_tasks")
+}
+
+model TaskAssignment {
+  assignmentId Int       @id @default(autoincrement()) @map("assignment_id")
+  taskId       Int       @map("task_id")
+  technicianId Int       @map("technician_id")
+  assignReason String?   @map("assign_reason") // Bắt buộc khi đổi KTV (BR-11)
+  assignedAt   DateTime  @default(now()) @map("assigned_at")
+  completedAt  DateTime? @map("completed_at")
+
+  workTask   WorkTask @relation(fields: [taskId], references: [taskId], onDelete: Cascade)
+  technician User     @relation(fields: [technicianId], references: [userId])
+
+  @@map("task_assignments")
+}
+
+// ==========================================
+// 4. KHO & LINH KIỆN (C11: TÁCH TỒN KHẢ DỤNG)
+// ==========================================
+
+model Part {
+  partId      Int     @id @default(autoincrement()) @map("part_id")
+  sku         String  @unique
+  partName    String  @map("part_name")
+  unit        String  @default("Cái")
+  stockQty    Int     @default(0) @map("stock_qty")    // Tồn thực tế
+  reservedQty Int     @default(0) @map("reserved_qty") // Tồn đã giữ chỗ (C11)
+  minStock    Int     @default(5) @map("min_stock")    // PARAM-06
+  unitPrice   Decimal @default(0) @map("unit_price") @db.Decimal(12, 2)
+
+  inventoryTransactions InventoryTransaction[]
+  workOrderParts        WorkOrderPart[]
+
+  @@map("parts")
+}
+
+model InventoryTransaction {
+  transId     Int                @id @default(autoincrement()) @map("trans_id")
+  partId      Int                @map("part_id")
+  workOrderId Int?               @map("work_order_id")
+  transType   InventoryTransType @map("trans_type")
+  quantity    Int
+  note        String?
+  transTime   DateTime           @default(now()) @map("trans_time")
+
+  part Part @relation(fields: [partId], references: [partId])
+
+  @@map("inventory_transactions")
+}
+
+model WorkOrderPart {
+  wopId       Int     @id @default(autoincrement()) @map("wop_id")
+  workOrderId Int     @map("work_order_id")
+  partId      Int     @map("part_id")
+  quantity    Int
+  returnedQty Int     @default(0) @map("returned_qty") // BR-16
+  unitPrice   Decimal @map("unit_price") @db.Decimal(12, 2)
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [workOrderId])
+  part      Part      @relation(fields: [partId], references: [partId])
+
+  @@map("work_order_parts")
+}
+
+// ==========================================
+// 5. KIỂM ĐỊNH (QC) & BÀN GIAO
+// ==========================================
+
+model Inspection {
+  inspectionId Int      @id @default(autoincrement()) @map("inspection_id")
+  workOrderId  Int      @map("work_order_id")
+  result       String   // PASS / FAIL
+  note         String?  @db.Text
+  inspectedBy  Int      @map("inspected_by")
+  inspectedAt  DateTime @default(now()) @map("inspected_at")
+
+  workOrder       WorkOrder        @relation(fields: [workOrderId], references: [workOrderId])
+  inspector       User             @relation(fields: [inspectedBy], references: [userId])
+  inspectionItems InspectionItem[]
+
+  @@map("inspections")
+}
+
+model InspectionItem {
+  itemId       Int     @id @default(autoincrement()) @map("item_id")
+  inspectionId Int     @map("inspection_id")
+  checkItem    String  @map("check_item")
+  isMandatory  Boolean @default(true) @map("is_mandatory") // BR-20
+  result       String  // PASS / FAIL
+  note         String?
+
+  inspection Inspection @relation(fields: [inspectionId], references: [inspectionId], onDelete: Cascade)
+
+  @@map("inspection_items")
+}
+
+model Handover {
+  handoverId     Int      @id @default(autoincrement()) @map("handover_id")
+  caseId         Int      @unique @map("case_id")
+  handedBy       Int      @map("handed_by")
+  receiverName   String   @map("receiver_name")
+  receiverPhone  String   @map("receiver_phone")
+  handoverDate   DateTime @default(now()) @map("handover_date")
+  customerRating Int?     @map("customer_rating") // 1-5 sao (FR-12)
+  feedback       String?  @db.Text
+
+  warrantyCase WarrantyCase @relation(fields: [caseId], references: [caseId])
+  staff        User         @relation("HandoverStaff", fields: [handedBy], references: [userId])
+
+  @@map("handovers")
+}
+
+// ==========================================
+// 6. SLA ENGINE (THỜI HẠN DỊCH VỤ - MỤC 6.3)
+// ==========================================
+
+model SlaPolicy {
+  slaPolicyId Int    @id @default(autoincrement()) @map("sla_policy_id")
+  serviceType String @map("service_type")
+  stage       String
+  timeLimit   Int    @map("time_limit") // Ví dụ: 3 ngày làm việc = 24 giờ làm việc
+  unit        String @default("WORK_HOURS")
+
+  slaInstances SlaInstance[]
+
+  @@map("sla_policies")
+}
+
+model SlaInstance {
+  slaId       Int      @id @default(autoincrement()) @map("sla_id")
+  caseId      Int      @map("case_id")
+  slaPolicyId Int      @map("sla_policy_id")
+  startTime   DateTime @map("start_time")
+  deadline    DateTime
+  status      String   @default("ACTIVE") // ACTIVE, PAUSED, COMPLETED, BREACHED
+
+  warrantyCase WarrantyCase @relation(fields: [caseId], references: [caseId])
+  slaPolicy    SlaPolicy    @relation(fields: [slaPolicyId], references: [slaPolicyId])
+  slaEvents    SlaEvent[]
+  slaPauses    SlaPause[]
+
+  @@map("sla_instances")
+}
+
+model SlaPause {
+  pauseId        Int       @id @default(autoincrement()) @map("pause_id")
+  slaId          Int       @map("sla_id")
+  reason         String    // WAITING_PARTS (max 3d), WAITING_QUOTE (max 5d)
+  maxAllowedMins Int       @map("max_allowed_mins") // C17
+  startTime      DateTime  @default(now()) @map("start_time")
+  endTime        DateTime? @map("end_time")
+
+  slaInstance SlaInstance @relation(fields: [slaId], references: [slaId])
+
+  @@map("sla_pauses")
+}
+
+model SlaEvent {
+  eventId   Int      @id @default(autoincrement()) @map("event_id")
+  slaId     Int      @map("sla_id")
+  eventType String   @map("event_type") // CREATED, WARNING_4H, PAUSED, RESUMED, BREACHED
+  eventTime DateTime @default(now()) @map("event_time")
+  note      String?
+
+  slaInstance SlaInstance @relation(fields: [slaId], references: [slaId])
+
+  @@map("sla_events")
+}
+
+// ==========================================
+// 7. WORKFLOW, AUDIT LOG & OUTBOX (HẠ TẦNG)
+// ==========================================
+
+model WorkflowTransition {
+  transitionId Int        @id @default(autoincrement()) @map("transition_id")
+  fromStatus   CaseStatus @map("from_status")
+  toStatus     CaseStatus @map("to_status")
+  condition    String?
+
+  transitionRoles TransitionRole[]
+  histories       CaseStatusHistory[]
+
+  @@unique([fromStatus, toStatus])
+  @@map("workflow_transitions")
+}
+
+model TransitionRole {
+  transitionId Int @map("transition_id")
+  roleId       Int @map("role_id")
+
+  transition WorkflowTransition @relation(fields: [transitionId], references: [transitionId], onDelete: Cascade)
+  role       Role               @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+
+  @@id([transitionId, roleId])
+  @@map("transition_roles")
+}
+
+model CaseStatusHistory {
+  historyId    Int        @id @default(autoincrement()) @map("history_id")
+  caseId       Int        @map("case_id")
+  transitionId Int?       @map("transition_id")
+  fromStatus   CaseStatus @map("from_status")
+  toStatus     CaseStatus @map("to_status")
+  reason       String?
+  changedBy    Int        @map("changed_by")
+  changedAt    DateTime   @default(now()) @map("changed_at")
+
+  warrantyCase WarrantyCase        @relation(fields: [caseId], references: [caseId])
+  transition   WorkflowTransition? @relation(fields: [transitionId], references: [transitionId])
+  user         User                @relation(fields: [changedBy], references: [userId])
+
+  @@map("case_status_history")
+}
+
+model AuditLog {
+  logId      Int      @id @default(autoincrement()) @map("log_id")
+  userId     Int?     @map("user_id")
+  entityType String   @map("entity_type") // WarrantyCase, WorkOrder, Quotation, Part...
+  entityId   String   @map("entity_id")
+  action     String   // CREATE, UPDATE, DELETE, APPROVE, STATUS_CHANGE
+  oldValue   Json?    @map("old_value") // NFR-02
+  newValue   Json?    @map("new_value") // NFR-02
+  logTime    DateTime @default(now()) @map("log_time")
+
+  user User? @relation(fields: [userId], references: [userId])
+
+  @@map("audit_logs")
+}
+
+// Bảng phục vụ Transactional Outbox Pattern (NFR-03)
+model OutboxEvent {
+  id          String    @id @default(uuid())
+  aggregateId String    @map("aggregate_id") // caseId hoặc woId
+  eventType   String    @map("event_type")   // CaseCreated, QuoteSent, PartReserved...
+  payload     Json
+  processed   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([processed, createdAt])
+  @@map("outbox_events")
+}
+
+// Bảng lưu 18 tham số cấu hình PARAM-01..18 (Mục 5.5)
+model SystemParameter {
+  paramCode   String   @id @map("param_code") // PARAM-01 .. PARAM-18
+  paramName   String   @map("param_name")
+  paramValue  String   @map("param_value")
+  unit        String?
+  description String?
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_parameters")
+}

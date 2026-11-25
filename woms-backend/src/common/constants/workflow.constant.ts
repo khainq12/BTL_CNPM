@@ -1,0 +1,25 @@
+import { CaseStatus } from '@prisma/client';
+
+export const ALLOWED_TRANSITIONS: Record<CaseStatus, CaseStatus[]> = {
+  [CaseStatus.DRAFT]: [CaseStatus.PENDING_ACCEPT, CaseStatus.RECEIVED, CaseStatus.CANCELLED],
+  [CaseStatus.PENDING_ACCEPT]: [CaseStatus.RECEIVED, CaseStatus.CANCELLED],
+  [CaseStatus.RECEIVED]: [CaseStatus.PRECHECK, CaseStatus.DIAGNOSING, CaseStatus.CANCELLED],
+  [CaseStatus.PRECHECK]: [CaseStatus.WAITING_INFORMATION, CaseStatus.DIAGNOSING, CaseStatus.CANCELLED],
+  [CaseStatus.WAITING_INFORMATION]: [CaseStatus.PRECHECK, CaseStatus.DIAGNOSING, CaseStatus.CANCELLED],
+  [CaseStatus.DIAGNOSING]: [CaseStatus.ELIGIBILITY_REVIEW, CaseStatus.QUOTED, CaseStatus.WO_CREATED],
+  [CaseStatus.ELIGIBILITY_REVIEW]: [CaseStatus.WAITING_APPROVAL, CaseStatus.QUOTED, CaseStatus.WO_CREATED],
+  [CaseStatus.WAITING_APPROVAL]: [CaseStatus.QUOTED, CaseStatus.WO_CREATED, CaseStatus.RETURN_PENDING],
+  [CaseStatus.QUOTED]: [CaseStatus.WAITING_APPROVAL, CaseStatus.WO_CREATED, CaseStatus.RETURN_PENDING],
+  [CaseStatus.WO_CREATED]: [CaseStatus.WAITING_PARTS, CaseStatus.READY_TO_REPAIR, CaseStatus.ASSIGNED],
+  [CaseStatus.WAITING_PARTS]: [CaseStatus.READY_TO_REPAIR],
+  [CaseStatus.READY_TO_REPAIR]: [CaseStatus.ASSIGNED],
+  [CaseStatus.ASSIGNED]: [CaseStatus.IN_REPAIR],
+  [CaseStatus.IN_REPAIR]: [CaseStatus.TESTING, CaseStatus.WAITING_PARTS],
+  [CaseStatus.TESTING]: [CaseStatus.READY_FOR_DELIVERY, CaseStatus.REWORK, CaseStatus.MANAGER_REVIEW],
+  [CaseStatus.REWORK]: [CaseStatus.IN_REPAIR],
+  [CaseStatus.MANAGER_REVIEW]: [CaseStatus.IN_REPAIR, CaseStatus.RETURN_PENDING, CaseStatus.CANCELLED],
+  [CaseStatus.READY_FOR_DELIVERY]: [CaseStatus.COMPLETED],
+  [CaseStatus.COMPLETED]: [],
+  [CaseStatus.RETURN_PENDING]: [CaseStatus.COMPLETED],
+  [CaseStatus.CANCELLED]: [],
+};

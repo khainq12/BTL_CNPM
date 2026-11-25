@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: woms_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: woms_admin
+      POSTGRES_PASSWORD: woms_secret_password
+      POSTGRES_DB: woms_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - woms_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: woms_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  woms_pgdata:

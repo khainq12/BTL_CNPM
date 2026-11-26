@@ -25,6 +25,7 @@
     "test:e2e": "npm run test -w @woms/e2e",
     "test": "npm run test:unit && npm run test:api",
     "report": "node scripts/test-report.mjs",
+    "demo": "node scripts/demo.mjs",
     "db:local": "node scripts/local-postgres.mjs",
     "dev:api": "npm run dev -w @woms/api",
     "dev:web": "npm run dev -w @woms/staff-web",

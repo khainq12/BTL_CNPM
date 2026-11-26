@@ -31,6 +31,13 @@ Yêu cầu: Node.js 24, npm 11. Không cần Docker cho máy cá nhân.
 
 ```bash
 npm ci
+npm run demo               # một lệnh: PostgreSQL + API + giao diện nhân viên + cổng khách hàng (Ctrl+C để dừng)
+                           # thêm "-- --reset" để nạp lại dữ liệu mẫu
+```
+
+Chạy từng phần riêng:
+
+```bash
 npm run build:domain
 
 # 1) Bản chạy thử không cần backend (dữ liệu giả trong trình duyệt, cùng quy tắc nghiệp vụ)

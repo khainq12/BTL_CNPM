@@ -1,5 +1,5 @@
 # Image cổng khách hàng. Build từ thư mục gốc: docker build -f apps/portal/Dockerfile --build-arg VITE_API_URL=https://api.example -t woms-portal .
-FROM node:24-bookworm-slim AS build
+FROM node:25-bookworm-slim AS build
 WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY packages/domain/package.json packages/domain/

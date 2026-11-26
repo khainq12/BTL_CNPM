@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { api } from './api';
+import { AppProvider, useApp } from './AppState';
 import { toInputValue } from './format';
 import DashboardPage from './pages/DashboardPage';
 import PortalPage from './pages/PortalPage';
 import SlaPage from './pages/SlaPage';
-import { StoreProvider, useStore } from './store';
 
 const TABS = [
   { id: 'portal', label: 'Cổng khách hàng' },
@@ -18,7 +19,7 @@ const readHash = (): TabId => {
 };
 
 function Shell() {
-  const { now, setNow } = useStore();
+  const { now, setNow } = useApp();
   const [tab, setTab] = useState<TabId>(readHash);
   useEffect(() => {
     const f = () => setTab(readHash());
@@ -33,14 +34,16 @@ function Shell() {
         <nav>
           {TABS.map((t) => <a key={t.id} href={`#${t.id}`} className={tab === t.id ? 'on' : ''}>{t.label}</a>)}
         </nav>
-        <div className="clock">
-          <label className="inline">Giờ hệ thống mẫu
-            <input type="datetime-local" value={toInputValue(now)}
-              onChange={(e) => { const v = new Date(e.target.value).getTime(); if (!isNaN(v)) setNow(v); }} />
-          </label>
-          <button className="btn s" onClick={() => setNow(now + 3_600_000)}>+1 giờ</button>
-          <button className="btn s" onClick={() => setNow(now + 86_400_000)}>+1 ngày</button>
-        </div>
+        {api.dev && (
+          <div className="clock">
+            <label className="inline">Giờ hệ thống mẫu
+              <input type="datetime-local" value={toInputValue(now)}
+                onChange={(e) => { const v = new Date(e.target.value).getTime(); if (!isNaN(v)) setNow(v); }} />
+            </label>
+            <button className="btn s" onClick={() => setNow(now + 3_600_000)}>+1 giờ</button>
+            <button className="btn s" onClick={() => setNow(now + 86_400_000)}>+1 ngày</button>
+          </div>
+        )}
       </header>
       <main>
         {tab === 'portal' && <PortalPage />}
@@ -52,5 +55,5 @@ function Shell() {
 }
 
 export default function App() {
-  return <StoreProvider><Shell /></StoreProvider>;
+  return <AppProvider><Shell /></AppProvider>;
 }

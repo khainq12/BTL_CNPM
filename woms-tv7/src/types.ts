@@ -16,7 +16,10 @@ export interface WorkCalendar {
   holidays: string[]; // 'YYYY-MM-DD'
 }
 
-export interface Pause { from: number; to: number | null; reason: string }
+/** Lý do tạm dừng. Mỗi loại có thể có trần thời gian riêng (BR-26, PARAM-16, PARAM-17). */
+export type PauseKind = 'DOCS' | 'QUOTE_WAIT' | 'QUOTE_RECONFIRM' | 'WAITING_PARTS' | 'CUSTOMER_DELAY';
+
+export interface Pause { from: number; to: number | null; kind: PauseKind; reason: string }
 
 export interface SlaInstance {
   code: SlaCode;
@@ -28,29 +31,64 @@ export interface SlaInstance {
 
 export interface CaseEvent { step: number; at: number }
 
+/** Báo giá có phí. Trên ngưỡng PARAM-03 phải được quản lý duyệt trước khi gửi khách (BR-07). */
+export type QuoteStatus = 'PENDING_MANAGER' | 'SENT' | 'ACCEPTED' | 'REJECTED';
+export interface Quote { parts: number; labor: number; status: QuoteStatus; sentAt: number | null }
+export interface PublicQuote { parts: number; labor: number; total: number }
+
+export interface ReplacedPart { name: string; qty: number }
+
 export interface WarrantyCase {
   code: string;
   phone: string;
+  serial: string;
   device: string;
   symptom: string;
   status: CaseStatus;
   receivedAt: number;
   events: CaseEvent[];
   sla: SlaInstance[];
-  quote: number;
+  quote: Quote | null;
+  parts: ReplacedPart[];
 }
 
 /** Chỉ gồm thông tin khách hàng được phép xem. Không có SĐT, SLA, ghi chú nội bộ. */
 export interface PublicCase {
   code: string;
+  serial: string;
   device: string;
   symptom: string;
   receivedAt: number;
   step: number;
   note: string;
+  /** Phiếu đã bàn giao hoặc đã đóng: thanh tiến độ hiện hoàn tất. */
+  closed: boolean;
   events: CaseEvent[];
-  quote: number;
+  quote: PublicQuote | null;
+}
+
+export interface HistoryEntry {
+  code: string;
+  receivedAt: number;
+  status: CaseStatus;
+  parts: ReplacedPart[];
+  warrantyUntil: number | null; // bảo hành sau sửa chữa (PARAM-01)
 }
 
 export interface SlaPolicy { name: string; hours: number }
 export type PolicyMap = Record<SlaCode, SlaPolicy>;
+
+/** Nhật ký cảnh báo (BR-25, FR-14 → SLAAlertLog). */
+export type Role = 'COORDINATOR' | 'MANAGER' | 'CSKH';
+export type AlertKind = 'SLA_WARN' | 'SLA_BREACH' | 'PARTS_WAIT_LIMIT' | 'QUOTE_NO_REPLY';
+export type AlertStatus = 'OPEN' | 'HANDLED' | 'ESCALATED';
+export interface SlaAlert {
+  id: string;
+  caseCode: string;
+  slaCode: SlaCode | null;
+  kind: AlertKind;
+  raisedAt: number;
+  recipients: Role[];
+  status: AlertStatus;
+  result: string;
+}

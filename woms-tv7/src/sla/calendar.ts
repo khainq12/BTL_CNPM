@@ -60,3 +60,22 @@ export function workingMinutesBetween(a: number, b: number, cal: WorkCalendar): 
   }
   return sum;
 }
+
+/** Số phút của một ngày làm việc (trừ nghỉ trưa). Dùng để đổi “ngày làm việc” của tài liệu nghiệp vụ sang phút. */
+export function workdayMinutes(cal: WorkCalendar): number {
+  const lunch = cal.lunch ? cal.lunch[1] - cal.lunch[0] : 0;
+  return Math.max(0, cal.endMin - cal.startMin - lunch);
+}
+
+/** Số ngày làm việc trọn vẹn đã trôi qua giữa a và b. */
+export function elapsedWorkingDays(a: number, b: number, cal: WorkCalendar): number {
+  const w = workdayMinutes(cal);
+  return w > 0 ? Math.floor(workingMinutesBetween(a, b, cal) / w) : 0;
+}
+
+/** Cộng n tháng, giữ nguyên giờ; ngày vượt quá tháng đích thì lùi về ngày cuối tháng. */
+export function addMonths(t: number, n: number): number {
+  const d = new Date(t);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + n + 1, 0).getDate();
+  return new Date(d.getFullYear(), d.getMonth() + n, Math.min(d.getDate(), lastDay), d.getHours(), d.getMinutes()).getTime();
+}

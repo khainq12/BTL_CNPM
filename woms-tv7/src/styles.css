@@ -60,3 +60,7 @@ td.acts{white-space:nowrap}td.acts .btn{margin-right:4px}
 ul.l{list-style:none;margin:0;padding:0}ul.l li{padding:6px 0;border-bottom:1px solid var(--ln)}
 ul.l time{color:var(--mut);font-size:13px;margin-right:8px}
 @media (max-width:560px){.dist{grid-template-columns:100px 1fr 26px}}
+select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--ln);border-radius:6px;padding:3px 6px;margin-right:4px;max-width:100%}
+table.quote{width:auto;margin:6px 0}
+table.quote td{border:0;padding:2px 24px 2px 0}
+table.quote tr.total td{font-weight:600;border-top:1px solid var(--ln)}

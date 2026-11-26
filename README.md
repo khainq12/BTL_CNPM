@@ -1,3 +1,4 @@
+HEAD
 # WOMS Database - Tài liệu Thiết kế (Data Dictionary)
 
  File này giải thích chi tiết cấu trúc các bảng, ý nghĩa các cột và các giá trị hợp lệ (Enum) để Backend, Frontend và QA làm việc thống nhất.
@@ -37,6 +38,13 @@ Lưu trữ thông tin thiết bị của khách hàng.
 
 Dưới đây là sơ đồ luồng đi của một ca bảo hành (`warranty_cases`). Hệ thống Database đã được cài đặt Trigger để **chặn đứng** mọi hành vi cố tình chuyển trạng thái sai quy định.
 
+---
+
+##  Quy trình Trạng thái (Workflow State Machine)
+
+Dưới đây là sơ đồ luồng đi của một ca bảo hành (`warranty_cases`). Hệ thống Database đã được cài đặt Trigger để chặn hành vi cố tình chuyển trạng thái sai quy định.
+ 3a84a90acc7cdd670aea6426e1e227d2bda61a47
+
 ```mermaid
 stateDiagram-v2
     [*] --> New : Khách hàng mang máy đến / Tạo API
@@ -54,3 +62,7 @@ stateDiagram-v2
     
     Resolved --> Closed : Giao máy cho khách & Thanh toán
     Closed --> [*]
+ HEAD
+
+
+ 3a84a90acc7cdd670aea6426e1e227d2bda61a47

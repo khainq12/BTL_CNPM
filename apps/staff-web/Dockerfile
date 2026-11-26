@@ -15,7 +15,7 @@ ARG VITE_API_URL=http://localhost:3000
 ENV VITE_API_URL=${VITE_API_URL}
 RUN cd apps/staff-web && npx vite build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 COPY deploy/nginx-spa.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/staff-web/dist /usr/share/nginx/html
 EXPOSE 8080

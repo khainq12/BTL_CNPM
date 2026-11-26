@@ -1,6 +1,6 @@
 # Image backend WOMS. Build từ thư mục gốc repo: docker build -f apps/api/Dockerfile -t woms-api .
 # Nhiều tầng: tầng build có đủ công cụ, tầng chạy chỉ giữ thư viện cần thiết, chạy bằng tài khoản không phải root.
-FROM node:24-bookworm-slim AS build
+FROM node:25-bookworm-slim AS build
 WORKDIR /repo
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
@@ -16,7 +16,7 @@ RUN npm run build -w @woms/domain && npm run build -w @woms/api \
   && npm prune --omit=dev -w @woms/api -w @woms/domain --include-workspace-root=false \
   && cd apps/api && npx prisma generate
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:25-bookworm-slim AS runtime
 ENV NODE_ENV=production PORT=3000
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates wget && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

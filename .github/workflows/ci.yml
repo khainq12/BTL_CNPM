@@ -69,7 +69,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Staff-web (component test trên trình duyệt)
         run: npm run test -w @woms/staff-web
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: junit-unit
@@ -102,7 +102,7 @@ jobs:
       - run: npm run test:api
       - name: Xuất đặc tả OpenAPI
         run: node apps/api/dist/openapi.js reports/openapi.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: junit-api
@@ -135,7 +135,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Chạy kịch bản E2E
         run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -143,7 +143,7 @@ jobs:
             reports/playwright/
             reports/playwright-artifacts/
           retention-days: 14
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: junit-e2e
@@ -166,7 +166,7 @@ jobs:
           merge-multiple: true
       - name: Tổng hợp (ghi vào Summary của lần chạy)
         run: node scripts/test-report.mjs --strict
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-report

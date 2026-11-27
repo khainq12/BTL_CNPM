@@ -4,11 +4,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, RotateCcw } from 'lucide-react'
+import { toast } from 'sonner'
 import { describeError } from '@/api/hooks'
 import { login } from '@/api/service'
 import { resetDb } from '@/mock/db'
 import { useAuthStore } from '@/stores/auth-store'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,6 +31,7 @@ export function SignIn() {
   const qc = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [confirmReset, setConfirmReset] = useState(false)
   const form = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), defaultValues: { username: '', password: '' } })
 
   async function onSubmit(v: z.infer<typeof schema>) {
@@ -48,11 +51,20 @@ export function SignIn() {
     }
   }
 
+  function handleConfirmReset() {
+    resetDb()
+    qc.clear()
+    setError(null)
+    setConfirmReset(false)
+    toast.success('Đã khôi phục dữ liệu mẫu')
+  }
+
   return (
     <AuthLayout>
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-lg'>Đăng nhập</CardTitle>
+      <Card className='border-border/80 gap-5 overflow-hidden pt-0 pb-6 shadow-[0_1px_2px_rgb(19_33_46/0.04),0_14px_34px_-16px_rgb(19_33_46/0.14)] dark:shadow-[0_16px_36px_-14px_rgb(0_0_0/0.5)]'>
+        <div className='bg-primary h-1 w-full' aria-hidden />
+        <CardHeader className='pt-1'>
+          <CardTitle className='text-xl tracking-tight'>Đăng nhập</CardTitle>
           <CardDescription>Dùng tài khoản nhân viên do quản lý cấp. Mỗi tài khoản gắn với một vai trò.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -71,7 +83,7 @@ export function SignIn() {
                   <FormItem>
                     <FormLabel>Tên đăng nhập</FormLabel>
                     <FormControl>
-                      <Input {...field} autoComplete='username' autoFocus />
+                      <Input {...field} className='h-10' placeholder='VD: tiepnhan' autoComplete='username' autoFocus />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -84,13 +96,13 @@ export function SignIn() {
                   <FormItem>
                     <FormLabel>Mật khẩu</FormLabel>
                     <FormControl>
-                      <PasswordInput {...field} autoComplete='current-password' />
+                      <PasswordInput {...field} className='[&_input]:h-10' placeholder='Nhập mật khẩu' autoComplete='current-password' />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type='submit' disabled={loading}>
+              <Button type='submit' disabled={loading} className='mt-1 h-10 w-full font-medium shadow-xs'>
                 {loading && <Loader2 className='animate-spin' />}
                 {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </Button>
@@ -98,21 +110,29 @@ export function SignIn() {
           </Form>
         </CardContent>
       </Card>
-      <p className='text-muted-foreground text-xs'>
-        Bản chạy thử với dữ liệu giả, chưa nối backend. Danh sách tài khoản mẫu xem trong README.txt của thư mục frontend.{' '}
+
+      <div className='border-border/70 bg-muted/40 text-muted-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed'>
+        <p>Bản chạy thử với dữ liệu giả, chưa nối backend. Danh sách tài khoản mẫu xem trong README.txt của thư mục frontend.</p>
         <button
           type='button'
-          className='hover:text-foreground underline underline-offset-2'
-          onClick={() => {
-            if (confirm('Xóa mọi thay đổi và khôi phục dữ liệu mẫu ban đầu?')) {
-              resetDb()
-              qc.clear()
-            }
-          }}
+          className='text-foreground/85 hover:text-foreground mt-2 inline-flex items-center gap-1.5 font-medium underline underline-offset-4'
+          onClick={() => setConfirmReset(true)}
         >
+          <RotateCcw className='size-3.5' aria-hidden />
           Khôi phục dữ liệu mẫu
         </button>
-      </p>
+      </div>
+
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title='Khôi phục dữ liệu mẫu'
+        desc='Xóa mọi thay đổi hiện tại trong trình duyệt và khôi phục dữ liệu mẫu ban đầu?'
+        cancelBtnText='Hủy'
+        confirmText='Khôi phục'
+        destructive
+        handleConfirm={handleConfirmReset}
+      />
     </AuthLayout>
   )
 }

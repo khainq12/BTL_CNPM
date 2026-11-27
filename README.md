@@ -31,8 +31,6 @@ Lưu trữ thông tin thiết bị của khách hàng.
 | `model` | VARCHAR | | Dòng máy |
 | `warranty_expiry` | DATE | | Ngày hết hạn bảo hành |
 
-*(Lưu ý: Bạn hãy làm tương tự cho các bảng quan trọng khác như `users`, `work_orders`, `sla_policies`...)*
----
 
 ## 2. Quy trình Trạng thái (Workflow State Machine)
 
@@ -43,7 +41,7 @@ Dưới đây là sơ đồ luồng đi của một ca bảo hành (`warranty_ca
 ##  Quy trình Trạng thái (Workflow State Machine)
 
 Dưới đây là sơ đồ luồng đi của một ca bảo hành (`warranty_cases`). Hệ thống Database đã được cài đặt Trigger để chặn hành vi cố tình chuyển trạng thái sai quy định.
- 3a84a90acc7cdd670aea6426e1e227d2bda61a47
+
 
 ```mermaid
 stateDiagram-v2
@@ -65,4 +63,4 @@ stateDiagram-v2
  HEAD
 
 
- 3a84a90acc7cdd670aea6426e1e227d2bda61a47
+ 
